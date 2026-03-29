@@ -1,0 +1,13 @@
+{
+  "name": "atelier-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "L'Atelier CRM - CRM statique léger pour leads, clients, suivi, idées et IA.",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

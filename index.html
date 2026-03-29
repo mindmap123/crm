@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#FFF4ED">
+  <meta name="description" content="CRM léger pour gérer leads, clients, suivi, idées et IA de L'Atelier CRM.">
+  <title>L'atelier CRM</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-icon">L'ATELIER CRM</div>
+      <h1>L'atelier CRM</h1>
+      <p>Accès administrateur</p>
+    </div>
+    <div class="form-group">
+      <label>Identifiant</label>
+      <input type="text" id="loginUser" placeholder="Votre identifiant" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <p id="loginError" class="error-text" style="display:none">Identifiants incorrects.</p>
+    <button class="btn-primary btn-block" id="loginBtn">Se connecter</button>
+    <button class="btn-ghost btn-block" id="demoBtn" style="margin-top:10px">Charger une démo</button>
+    <p style="text-align:center;margin-top:16px;font-size:11px;color:var(--text3)">Appuyez sur <kbd style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:monospace">Entrée</kbd> pour valider</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell" style="display:none">
+
+  <!-- SIDEBAR desktop -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon-sm">L'ATELIER CRM</div>
+    </div>
+    <nav id="sidebarNav">
+      <a class="nav-link active" data-view="dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Vue globale
+      </a>
+      <a class="nav-link" data-view="students">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Clients
+      </a>
+      <a class="nav-link" data-view="prospects">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+        Leads
+      </a>
+      <a class="nav-link" data-view="todos">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.18L10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c1.57 0 3.04.46 4.28 1.25l1.45-1.45C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10c1.73 0 3.36-.44 4.78-1.22l-1.5-1.5C14.28 19.74 13.17 20 12 20z"/></svg>
+        Suivi
+        <span class="todo-badge" style="display:none">0</span>
+      </a>
+      <a class="nav-link" data-view="ideas">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21h6v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+        Idées
+      </a>
+      <a class="nav-link" data-view="ai">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.76 4.24L18 8l-4.24 1.76L12 14l-1.76-4.24L6 8l4.24-1.76L12 2zm7 13l.94 2.06L22 18l-2.06.94L19 21l-.94-2.06L16 18l2.06-.94L19 15zM5 14l1.17 2.83L9 18l-2.83 1.17L5 22l-1.17-2.83L1 18l2.83-1.17L5 14z"/></svg>
+        IA
+      </a>
+      <div class="nav-shortcut">
+        <kbd>⌘</kbd><kbd>N</kbd>
+      </div>
+      <a class="nav-link" data-view="analytics">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+        Pilotage
+      </a>
+      <a class="nav-link nav-journal-only" data-view="journal">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm-1 8H8v-2h4v2zm3-4H8v-2h7v2z"/></svg>
+        Journal
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <div class="user-avatar-sm" id="sidebarUserAvatar">A</div>
+        <span id="sidebarUserName">Admin</span>
+      </div>
+      <button class="logout-btn ai-config-only" id="aiSettingsBtn" title="Configuration IA">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.76 4.24L18 8l-4.24 1.76L12 14l-1.76-4.24L6 8l4.24-1.76L12 2zm7 13l.94 2.06L22 18l-2.06.94L19 21l-.94-2.06L16 18l2.06-.94L19 15zM5 14l1.17 2.83L9 18l-2.83 1.17L5 22l-1.17-2.83L1 18l2.83-1.17L5 14z"/></svg>
+      </button>
+      <button class="logout-btn" id="logoutBtn" title="Déconnexion">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- MOBILE HEADER -->
+    <div class="mobile-header">
+      <div class="mobile-header-brand">
+        <div class="brand-icon-sm">L'ATELIER CRM</div>
+      </div>
+      <button class="mobile-header-user" id="mobileLogoutBtn">
+        <div class="user-avatar-sm" id="mobileUserAvatar">A</div>
+      </button>
+      <button class="icon-btn ai-config-only" id="mobileAiSettingsBtn" title="Configuration IA">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.76 4.24L18 8l-4.24 1.76L12 14l-1.76-4.24L6 8l4.24-1.76L12 2zm7 13l.94 2.06L22 18l-2.06.94L19 21l-.94-2.06L16 18l2.06-.94L19 15zM5 14l1.17 2.83L9 18l-2.83 1.17L5 22l-1.17-2.83L1 18l2.83-1.17L5 14z"/></svg>
+      </button>
+    </div>
+
+    <!-- ─── DASHBOARD ─── -->
+    <div id="dashView" class="view-section">
+      <header class="page-header">
+        <div>
+          <h2>Bonjour, <span id="welcomeName">Admin</span> 👋</h2>
+          <p class="subtitle" id="todayDate"></p>
+        </div>
+        <button class="btn-primary hide-mobile" id="addBtnDash">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nouveau lead
+        </button>
+      </header>
+
+      <!-- Rappels du jour -->
+      <div id="remindersSection" style="display:none">
+        <div class="section-header">
+          <h3>📞 Relances du jour</h3>
+          <button class="btn-text" data-view="prospects">Ouvrir les leads →</button>
+        </div>
+        <div id="remindersList" class="reminders-list"></div>
+      </div>
+
+      <div class="stats-row" id="statsRow"></div>
+      <div class="dashboard-split">
+        <section class="soft-panel">
+          <div class="soft-panel-head">
+            <h3>À traiter maintenant</h3>
+            <button class="btn-text" data-view="todos">Voir le suivi →</button>
+          </div>
+          <div id="todayBoard" class="simple-list"></div>
+        </section>
+        <section class="soft-panel">
+          <div class="soft-panel-head">
+            <h3>Vue rapide</h3>
+            <button class="btn-text" data-view="analytics">Voir le pilotage →</button>
+          </div>
+          <div id="quickBoard" class="quick-grid"></div>
+        </section>
+      </div>
+      <div class="section-header" id="recentHeader">
+        <h3>Clients récents</h3>
+        <button class="btn-text" data-view="students">Voir tous →</button>
+      </div>
+      <div class="cards-grid" id="recentCards"></div>
+      <div id="dashEmpty" class="empty-state" style="display:none">
+        <div class="empty-icon">🚀</div>
+        <h3>Aucun client pour le moment</h3>
+        <p>Commencez par ajouter un lead dans la base leads.</p>
+      </div>
+    </div>
+
+    <!-- ─── STUDENTS ─── -->
+    <div id="studentsView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">Clients</span>
+      </div>
+      <header class="page-header">
+        <div><h2>Clients</h2><p class="subtitle" id="studentCount">0 client</p></div>
+        <button class="btn-primary hide-mobile" id="addBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Ajouter un client
+        </button>
+      </header>
+      <div class="toolbar">
+        <div class="search-box">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#8E8E93"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" id="searchInput" placeholder="Rechercher...">
+        </div>
+        <div class="filter-pills">
+          <button class="pill active" data-filter="all">Tous</button>
+          <button class="pill" data-filter="active">Actifs</button>
+          <button class="pill green-pill" data-filter="green">Potentiel</button>
+          <button class="pill orange-pill" data-filter="orange">Surveiller</button>
+          <button class="pill red-pill" data-filter="red">Difficulté</button>
+        </div>
+      </div>
+      <div class="cards-grid" id="studentsGrid"></div>
+      <div id="emptyState" class="empty-state" style="display:none">
+        <div class="empty-icon">👥</div><h3>Aucun client trouvé</h3><p>Modifiez votre recherche ou convertissez un lead.</p>
+      </div>
+    </div>
+
+    <!-- ─── PROSPECTS ─── -->
+    <div id="prospectsView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">Leads</span>
+      </div>
+      <header class="page-header">
+        <div><h2>Leads</h2><p class="subtitle" id="prospectCount">0 lead</p></div>
+        <button class="btn-primary hide-mobile" id="addProspectBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nouveau lead
+        </button>
+      </header>
+
+      <!-- Mobile status tabs -->
+      <div class="prospect-tabs">
+        <button class="ptab active" data-status="all">Tous</button>
+        <button class="ptab ptab-froid" data-status="froid">🔵 Nouveau</button>
+        <button class="ptab ptab-chaud" data-status="chaud">🔥 Qualifié</button>
+        <button class="ptab ptab-signe" data-status="signe">✅ À convertir</button>
+      </div>
+
+      <!-- Desktop Kanban -->
+      <div class="kanban-board" id="kanbanBoard">
+        <div class="kanban-col">
+          <div class="kanban-col-header froid-header">
+            <span>🔵 Prospect</span><span class="kanban-count" id="countFroid">0</span>
+          </div>
+          <div class="kanban-cards" id="kanbanFroid" data-drop-status="froid"></div>
+          <button class="kanban-add-btn" data-status="froid">+ Ajouter</button>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-header chaud-header">
+            <span>🔥 1er contact</span><span class="kanban-count" id="countChaud">0</span>
+          </div>
+          <div class="kanban-cards" id="kanbanChaud" data-drop-status="chaud"></div>
+          <button class="kanban-add-btn" data-status="chaud">+ Ajouter</button>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-header signe-header">
+            <span>✅ Client signé</span><span class="kanban-count" id="countSigne">0</span>
+          </div>
+          <div class="kanban-cards" id="kanbanSigne" data-drop-status="signe"></div>
+          <button class="kanban-add-btn" data-status="signe">+ Ajouter</button>
+        </div>
+      </div>
+
+      <!-- Mobile List -->
+      <div id="prospectMobileList" class="cards-grid" style="display:none"></div>
+      <div id="prospectEmpty" class="empty-state" style="display:none">
+        <div class="empty-icon">💬</div><h3>Aucun lead</h3><p>Ajoutez votre premier lead.</p>
+      </div>
+    </div>
+
+    <!-- ─── ANALYTICS ─── -->
+    <div id="analyticsView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">Pilotage</span>
+      </div>
+      <header class="page-header">
+        <div><h2>Pilotage</h2><p class="subtitle">Lecture des leads et du delivery</p></div>
+      </header>
+      <div class="stats-row" id="analyticsKpis"></div>
+      <div class="modern-analytics-grid">
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div><h3>Revenus</h3><p class="chart-sub" id="revenueTotalLabel">—</p></div>
+          <div class="range-selector" id="rangeRevenue">
+            <button class="range-btn active" data-range="7">7j</button>
+            <button class="range-btn" data-range="30">30j</button>
+            <button class="range-btn" data-range="90">90j</button>
+          </div>
+        </div>
+        <div id="revenueStream" class="metric-stream"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div><h3>Croissance clients</h3><p class="chart-sub" id="studentsTotalLabel">—</p></div>
+          <div class="range-selector" id="rangeStudents">
+            <button class="range-btn active" data-range="7">7j</button>
+            <button class="range-btn" data-range="30">30j</button>
+            <button class="range-btn" data-range="90">90j</button>
+          </div>
+        </div>
+        <div id="studentsStream" class="metric-stream"></div>
+      </div>
+      </div>
+    </div>
+
+    <!-- ─── AI HUB ─── -->
+    <div id="aiView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">IA</span>
+      </div>
+      <section class="ai-hub-hero">
+        <div class="ai-hub-hero-inner">
+          <div class="ai-hub-kicker">Assistant d'équipe</div>
+          <h2>Une IA utile pour vendre, qualifier et faire avancer les leads</h2>
+          <p>Colle une note brute, un échange Insta, un résumé d'appel ou lance une lecture business. L'IA ici ne sert pas à résumer pour rien, elle sert à décider et produire.</p>
+          <div class="ai-hub-actions">
+            <button class="btn-primary ai-config-only" type="button" id="openAiConfigHubBtn">Configurer l'IA</button>
+            <button class="btn-ghost" type="button" data-ai-workspace-action="business">Lecture pilotage</button>
+          </div>
+        </div>
+        <div class="ai-orbit-card">
+          <div class="ai-orbit-pill">Qualifie</div>
+          <div class="ai-orbit-pill">Priorise</div>
+          <div class="ai-orbit-pill">Rédige</div>
+          <div class="ai-orbit-pill">Analyse</div>
+        </div>
+      </section>
+
+      <div class="ai-hub-grid">
+        <section class="soft-panel ai-workbench">
+          <div class="soft-panel-head">
+            <h3>Atelier IA</h3>
+            <span class="stream-pill" id="aiHubProviderLabel">OPENAI</span>
+          </div>
+          <div class="form-group">
+            <label>Colle ici une note brute, un message, une transcription ou un contexte</label>
+            <div class="ai-voice-row">
+              <button class="btn-ghost ai-voice-btn" type="button" id="aiVoiceBtn">Micro</button>
+              <span class="ai-voice-status" id="aiVoiceStatus">Ajoute idéalement le nom, le numéro, le métier, la source et ce qu'il faut faire ensuite.</span>
+            </div>
+            <textarea id="aiWorkspaceInput" rows="7" placeholder="Ex: Karim Benali, 06 12 34 56 78, plombier à Lyon, vu sur TikTok live, intéressé par le pack, veut un rappel demain vers 14h, budget un peu flou mais assez chaud"></textarea>
+          </div>
+          <div class="ai-tool-grid">
+            <button class="ai-tool-card" type="button" data-ai-workspace-action="intake">
+              <strong>Créer une fiche depuis une note</strong>
+              <span>Transforme un texte brut en lead structuré avec nom, téléphone, métier, source, statut et rappel.</span>
+            </button>
+            <button class="ai-tool-card" type="button" data-ai-workspace-action="qualify">
+              <strong>Qualifier un lead</strong>
+              <span>Donne le niveau du lead, les objections probables et le bon angle de relance.</span>
+            </button>
+            <button class="ai-tool-card" type="button" data-ai-workspace-action="next-step">
+              <strong>Prochaine action</strong>
+              <span>Décide quoi faire maintenant, quand le faire et pourquoi.</span>
+            </button>
+            <button class="ai-tool-card" type="button" data-ai-workspace-action="message">
+              <strong>Générer un message</strong>
+              <span>Rédige un DM, SMS ou message de closing prêt à envoyer.</span>
+            </button>
+            <button class="ai-tool-card" type="button" data-ai-workspace-action="business">
+              <strong>Lecture pilotage</strong>
+              <span>Lit tes données CRM et remonte 3 insights vraiment utiles.</span>
+            </button>
+          </div>
+          <div class="ai-hub-output" id="aiWorkspaceOutput">Choisis une fonction IA pour lancer une réponse utile. Le meilleur point d'entrée ici, c'est souvent <strong>Créer une fiche depuis une note</strong>.</div>
+        </section>
+
+        <section class="soft-panel">
+          <div class="soft-panel-head">
+            <h3>À quoi sert l'IA ici</h3>
+          </div>
+          <div class="ai-usage-list">
+            <div class="ai-usage-item">
+              <strong>1. Nettoyer une note terrain</strong>
+              <span>Tu colles une note brute, l'IA la transforme en informations exploitables.</span>
+            </div>
+            <div class="ai-usage-item">
+              <strong>2. Savoir quoi faire maintenant</strong>
+              <span>Elle ne résume pas pour faire joli. Elle tranche l'action prioritaire.</span>
+            </div>
+            <div class="ai-usage-item">
+              <strong>3. Gagner du temps sur les messages</strong>
+              <span>Elle produit des relances courtes, adaptées au canal et au stade du lead.</span>
+            </div>
+            <div class="ai-usage-item">
+              <strong>4. Lire le business sans se noyer</strong>
+              <span>Elle remonte les signaux importants: source qui convertit, leads oubliés, métier qui signe.</span>
+            </div>
+          </div>
+          <div class="detail-notes" style="margin-top:14px">
+            Réflexe conseillé : donne au minimum <strong>nom + téléphone + métier + source + contexte</strong>, puis clique <strong>Créer une fiche depuis une note</strong>. C'est là que l'IA a le plus de valeur pour votre équipe.
+          </div>
+          <div class="detail-notes ai-config-note" style="margin-top:12px;display:none">
+            La gestion des clés API est centralisée chez Waxx. Les autres comptes peuvent utiliser l’onglet IA sans voir ou modifier les tokens.
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ─── IDEAS ─── -->
+    <div id="ideasView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">Idées</span>
+      </div>
+      <header class="page-header">
+        <div><h2>Boîte à idées</h2><p class="subtitle">Débattre, trier, tester</p></div>
+      </header>
+      <div class="idea-composer">
+        <div class="form-group">
+          <label>Titre</label>
+          <input type="text" id="ideaTitle" placeholder="Ex: Live TikTok avec offre d'appel">
+        </div>
+        <div class="form-group">
+          <label>Idée</label>
+          <textarea id="ideaBody" rows="3" placeholder="Décris l'idée, le canal, l'objectif et pourquoi ça peut marcher."></textarea>
+        </div>
+        <div class="idea-composer-row">
+          <select id="ideaStatus">
+            <option value="to-discuss">À discuter</option>
+            <option value="approved">Validée</option>
+            <option value="testing">En test</option>
+            <option value="rejected">Refusée</option>
+          </select>
+          <button class="btn-primary" id="saveIdeaBtn">Ajouter l'idée</button>
+        </div>
+      </div>
+      <div id="ideasList" class="ideas-list"></div>
+      <div id="ideasEmpty" class="empty-state" style="display:none">
+        <div class="empty-icon">💡</div><h3>Aucune idée pour le moment</h3><p>Ajoutez une piste à débattre avec l'équipe.</p>
+      </div>
+    </div>
+
+    <!-- ─── JOURNAL (Waxx only) ─── -->
+    <div id="journalView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">Journal</span>
+      </div>
+      <header class="page-header">
+        <div><h2>Journal</h2><p class="subtitle">Historique des actions du funnel</p></div>
+        <button class="btn-ghost" id="clearJournalBtn">Vider</button>
+      </header>
+      <div id="journalList"></div>
+      <div id="journalEmpty" class="empty-state" style="display:none">
+        <div class="empty-icon">📋</div><h3>Aucune activité</h3><p>Les modifications apparaîtront ici.</p>
+      </div>
+    </div>
+
+    <!-- ─── TODOS ─── -->
+    <div id="todosView" class="view-section" style="display:none">
+      <div class="breadcrumb hide-mobile">
+        <button class="back-btn" data-view="dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Vue globale</button>
+        <span class="breadcrumb-sep">›</span><span class="breadcrumb-current">Suivi</span>
+      </div>
+      <header class="page-header">
+        <div><h2>Suivi</h2><p class="subtitle">Toutes les prochaines actions des leads au delivery</p></div>
+      </header>
+
+      <!-- Smart Input -->
+      <div class="todo-input-container">
+        <div class="todo-toolbar">
+          <div class="segmented" id="todoScope">
+            <button class="segmented-btn active" data-scope="mine" type="button">Mes tâches</button>
+            <button class="segmented-btn" data-scope="team" type="button">Équipe</button>
+          </div>
+          <select id="todoOwnerSelect" class="compact-select"></select>
+        </div>
+        <div class="todo-quick-schedule">
+          <div class="schedule-chip-row" id="todoQuickDate">
+            <button class="schedule-chip active" type="button" data-date-mode="today">Aujourd'hui</button>
+            <button class="schedule-chip" type="button" data-date-mode="tomorrow">Demain</button>
+            <button class="schedule-chip" type="button" data-date-mode="week">Cette semaine</button>
+            <button class="schedule-chip ghost" type="button" id="todoCustomToggle">Personnaliser</button>
+          </div>
+          <div class="schedule-chip-row" id="todoQuickTime">
+            <button class="schedule-chip active" type="button" data-time-value="09:00">09h00</button>
+            <button class="schedule-chip" type="button" data-time-value="14:00">14h00</button>
+            <button class="schedule-chip" type="button" data-time-value="17:30">17h30</button>
+            <button class="schedule-chip" type="button" data-time-value="">Sans heure</button>
+          </div>
+          <div class="todo-schedule-row" id="todoCustomSchedule" style="display:none">
+            <input type="date" id="todoDateInput" class="compact-select">
+            <input type="time" id="todoTimeInput" class="compact-select">
+          </div>
+          <div class="todo-schedule-preview" id="todoSchedulePreview">Rappel prévu aujourd'hui à 09h00</div>
+        </div>
+        <div class="todo-input-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#8E8E93"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <input type="text" id="todoInput" placeholder="Tâche... (ex: Relancer @Jean demain à 14h)" autocomplete="off">
+        </div>
+        <div class="todo-input-hint">💡 Utilisez @ pour mentionner · dates naturelles (demain, lundi prochain...) · <kbd>Cmd+K</kbd> pour actions rapides</div>
+        <div id="todoContextBar" class="todo-context-bar" style="display:none"></div>
+      </div>
+
+      <!-- Today Focus -->
+      <div class="todo-section">
+        <div class="todo-section-header">
+          <h3>Aujourd'hui</h3>
+          <span class="todo-section-count" id="todayCount">0</span>
+        </div>
+        <div class="todo-list" id="todayTodos"></div>
+      </div>
+
+      <!-- Overdue (collapsed by default) -->
+      <div class="todo-section" id="overdueSection" style="display:none">
+        <div class="todo-section-header todo-accordion" id="overdueToggle">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="accordion-icon" id="overdueIcon">▶</span>
+            <h3>En retard</h3>
+          </div>
+          <span class="todo-section-count overdue-count" id="overdueCount">0</span>
+        </div>
+        <div class="todo-list" id="overdueContent" style="display:none">
+          <div id="overdueTodos"></div>
+        </div>
+      </div>
+
+      <!-- Upcoming -->
+      <div class="todo-section">
+        <div class="todo-section-header">
+          <h3>À venir</h3>
+        </div>
+        <div class="todo-list" id="upcomingTodos"></div>
+      </div>
+
+      <!-- Completed -->
+      <div class="todo-section">
+        <div class="todo-section-header todo-accordion" id="completedToggle">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="accordion-icon" id="completedIcon">▶</span>
+            <h3>Terminées</h3>
+          </div>
+          <span class="todo-section-count" id="completedCount">0</span>
+        </div>
+        <div class="todo-list" id="completedContent" style="display:none">
+          <div id="completedTodos"></div>
+        </div>
+        <button class="btn-ghost" id="clearCompletedBtn" style="margin-top:8px;width:100%;justify-content:center;display:none">🗑️ Tout effacer</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <nav class="mobile-nav" id="mobileNav">
+    <a class="mobile-nav-item active" data-view="dashboard">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      <span>Vue</span>
+    </a>
+    <a class="mobile-nav-item" data-view="students">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      <span>Clients</span>
+    </a>
+    <a class="mobile-nav-item mobile-nav-add" id="mobileAddBtn">
+      <div class="mobile-add-circle">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </div>
+    </a>
+    <a class="mobile-nav-item" data-view="prospects">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+      <span>Leads</span>
+    </a>
+    <a class="mobile-nav-item" data-view="todos">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M22 5.18L10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c1.57 0 3.04.46 4.28 1.25l1.45-1.45C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10c1.73 0 3.36-.44 4.78-1.22l-1.5-1.5C14.28 19.74 13.17 20 12 20z"/></svg>
+      <span>Suivi</span>
+      <span class="todo-badge mobile-badge" style="display:none">0</span>
+    </a>
+    <a class="mobile-nav-item" data-view="ai">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21h6v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+      <span>IA</span>
+    </a>
+  </nav>
+
+</div>
+
+<!-- ═══ MODAL ÉLÈVE FORM ═══ -->
+<div id="formModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box">
+    <div class="modal-head">
+      <button class="back-btn-modal" data-close="formModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Retour</button>
+      <h3 id="formModalTitle">Ajouter</h3>
+      <button class="icon-btn" data-close="formModal"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal-scroll">
+      <div class="photo-section">
+        <div class="photo-ring" id="photoRing"><div class="photo-inner" id="photoInner"><svg width="32" height="32" viewBox="0 0 24 24" fill="#C7C7CC"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div></div>
+        <button type="button" class="btn-text" id="photoBtn">Choisir une photo</button>
+        <input type="file" id="photoFile" accept="image/*" style="display:none">
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group full"><label>Nom complet <span class="required">*</span></label><input type="text" id="fName" placeholder="Jean Dupont" autocomplete="name"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="fEmail" placeholder="jean@exemple.com" inputmode="email"></div>
+        <div class="form-group"><label>Téléphone</label><input type="tel" id="fPhone" placeholder="+33 6 00 00 00 00" inputmode="tel"></div>
+        <div class="form-group full">
+          <label>Métier</label>
+          <input type="hidden" id="fTrade" value="">
+          <div class="trade-selector" id="fTradeSelector"></div>
+        </div>
+        <div class="form-group"><label>Date d'entrée client</label><input type="date" id="fDate"></div>
+        <div class="form-group"><label>Montant payé (€)</label><input type="number" id="fAmount" placeholder="0" min="0" step="0.01" inputmode="decimal"></div>
+        <div class="form-group"><label>Moyen de paiement</label>
+          <select id="fMethod"><option value="">— Choisir —</option><option value="Skool / Stripe">Skool / Stripe</option><option value="RIB">RIB / Virement</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Niveau d'attention client</label>
+        <div class="sentiment-selector">
+          <label class="sentiment-opt"><input type="radio" name="sentiment" value="green" checked><div class="sentiment-card green-card"><div class="sentiment-dot green-dot"></div><div><strong>Bon potentiel</strong><span>Progresse bien</span></div></div></label>
+          <label class="sentiment-opt"><input type="radio" name="sentiment" value="orange"><div class="sentiment-card orange-card"><div class="sentiment-dot orange-dot"></div><div><strong>À surveiller</strong><span>Attention</span></div></div></label>
+          <label class="sentiment-opt"><input type="radio" name="sentiment" value="red"><div class="sentiment-card red-card"><div class="sentiment-dot red-dot"></div><div><strong>En difficulté</strong><span>Suivi renforcé</span></div></div></label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Services & Statut</label>
+        <div class="toggles-list">
+          <div class="toggle-row"><div class="toggle-label"><span class="toggle-emoji">🌐</span><div><strong>Site web</strong><span>Créé</span></div></div><label class="ios-toggle"><input type="checkbox" id="fWebsite"><span class="ios-slider"></span></label></div>
+          <div class="toggle-row"><div class="toggle-label"><span class="toggle-emoji">📍</span><div><strong>Google My Business</strong><span>Configuré</span></div></div><label class="ios-toggle"><input type="checkbox" id="fGmb"><span class="ios-slider"></span></label></div>
+          <div class="toggle-row"><div class="toggle-label"><span class="toggle-emoji">🎨</span><div><strong>Logo</strong><span>Créé</span></div></div><label class="ios-toggle"><input type="checkbox" id="fLogo"><span class="ios-slider"></span></label></div>
+          <div class="toggle-row highlight-row"><div class="toggle-label"><span class="toggle-emoji">⚡</span><div><strong>Membre actif</strong><span>Participe activement</span></div></div><label class="ios-toggle"><input type="checkbox" id="fActive" checked><span class="ios-slider"></span></label></div>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes internes</label><textarea id="fNotes" rows="3" placeholder="Remarques, objectifs..."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" data-close="formModal">Annuler</button>
+      <button class="btn-primary" id="saveStudentBtn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL PROSPECT FORM ═══ -->
+<div id="prospectFormModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box">
+    <div class="modal-head">
+      <button class="back-btn-modal" data-close="prospectFormModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Retour</button>
+      <h3 id="prospectFormTitle">Nouveau lead</h3>
+      <button class="icon-btn" data-close="prospectFormModal"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal-scroll">
+      <div class="form-grid-2">
+        <div class="form-group full"><label>Nom complet <span class="required">*</span></label><input type="text" id="pfName" placeholder="Jean Dupont" autocomplete="name"></div>
+        <div class="form-group"><label>Téléphone <span class="required">*</span></label><input type="tel" id="pfPhone" placeholder="+33 6 00 00 00 00" inputmode="tel"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="pfEmail" placeholder="jean@exemple.com" inputmode="email"></div>
+        <div class="form-group full">
+          <label>Métier</label>
+          <input type="hidden" id="pfTrade" value="">
+          <div class="trade-selector" id="pfTradeSelector"></div>
+        </div>
+        <div class="form-group full"><label>Source</label>
+          <select id="pfSource"><option value="">— Comment a-t-il été contacté ? —</option><option value="TikTok commentaire">TikTok commentaire</option><option value="TikTok live">TikTok live</option><option value="TikTok ads">TikTok ads</option><option value="Instagram">Instagram</option><option value="Instagram ads">Instagram ads</option><option value="Podcast">Podcast</option><option value="YouTube">YouTube</option><option value="Bouche à oreille">Bouche à oreille</option><option value="Référence client">Référence client</option><option value="Autre">Autre</option></select>
+        </div>
+        <div class="form-group full"><label>Responsable</label><select id="pfOwner"></select></div>
+      </div>
+
+      <!-- Statut -->
+      <div class="form-group">
+        <label>Étape du lead</label>
+        <div class="prospect-status-selector">
+          <label class="pstatus-opt">
+            <input type="radio" name="pfStatus" value="froid" checked>
+            <div class="pstatus-card froid-card"><span class="pstatus-icon">🔵</span><div><strong>Nouveau lead</strong><span>Premier contact</span></div></div>
+          </label>
+          <label class="pstatus-opt">
+            <input type="radio" name="pfStatus" value="chaud">
+            <div class="pstatus-card chaud-card"><span class="pstatus-icon">🔥</span><div><strong>Qualifié</strong><span>Intérêt confirmé</span></div></div>
+          </label>
+          <label class="pstatus-opt">
+            <input type="radio" name="pfStatus" value="signe">
+            <div class="pstatus-card signe-card"><span class="pstatus-icon">✅</span><div><strong>À convertir</strong><span>Prêt à devenir client</span></div></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Rappel -->
+      <div class="form-group">
+        <label>📞 Rappel de call</label>
+        <div class="reminder-inputs">
+          <input type="date" id="pfReminderDate" placeholder="Date">
+          <input type="time" id="pfReminderTime" placeholder="Heure">
+        </div>
+      </div>
+      <div class="form-group"><label>Note de rappel</label><input type="text" id="pfReminderNote" placeholder="Que dire lors du call ?"></div>
+      <div class="form-group"><label>Notes</label><textarea id="pfNotes" rows="3" placeholder="Informations utiles pour la conversion..."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" data-close="prospectFormModal">Annuler</button>
+      <button class="btn-primary" id="saveProspectBtn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL PROSPECT DETAIL ═══ -->
+<div id="prospectDetailModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box modal-wide">
+    <div class="modal-head">
+      <button class="back-btn-modal" data-close="prospectDetailModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Retour</button>
+      <h3>Fiche lead</h3>
+      <button class="icon-btn" data-close="prospectDetailModal"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal-scroll" id="prospectDetailContent"></div>
+    <div class="modal-foot">
+      <button class="btn-danger" id="deleteProspectBtn">Supprimer</button>
+      <button class="btn-primary" id="convertProspectBtn" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        Passer en client
+      </button>
+      <button class="btn-ghost" id="editProspectBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL ÉLÈVE DETAIL ═══ -->
+<div id="detailModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box modal-wide">
+    <div class="modal-head">
+      <button class="back-btn-modal" data-close="detailModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Retour</button>
+      <h3>Fiche client</h3>
+      <button class="icon-btn" data-close="detailModal"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal-scroll" id="detailContent"></div>
+    <div class="modal-foot">
+      <button class="btn-danger" id="deleteBtn">Supprimer</button>
+      <button class="btn-ghost" id="editFromDetailBtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL IA CONFIG ═══ -->
+<div id="aiModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box modal-wide">
+    <div class="modal-head">
+      <button class="back-btn-modal" data-close="aiModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Retour</button>
+      <h3>Assistant IA</h3>
+      <button class="icon-btn" data-close="aiModal"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal-scroll">
+      <div class="form-group">
+        <label>Provider actif</label>
+        <div class="segmented" id="aiProviderTabs">
+          <button class="segmented-btn active" type="button" data-provider="openai">OpenAI</button>
+          <button class="segmented-btn" type="button" data-provider="anthropic">Claude</button>
+          <button class="segmented-btn" type="button" data-provider="gemini">Gemini</button>
+          <button class="segmented-btn" type="button" data-provider="groq">Groq</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Modèle</label>
+        <input type="text" id="aiModelInput" placeholder="Ex: gpt-5-mini">
+      </div>
+      <div class="form-group">
+        <label>Clé API</label>
+        <input type="password" id="aiApiKeyInput" placeholder="Coller la clé API du provider choisi">
+      </div>
+      <div class="form-group">
+        <label>Ton IA</label>
+        <textarea id="aiStyleInput" rows="3" placeholder="Ex: sois direct, court, orienté conversion pour une équipe terrain"></textarea>
+      </div>
+      <div class="detail-notes" style="margin-top:8px">
+        Cette V1 stocke la clé API dans le navigateur pour aller vite. Pour une vraie prod, il faudra la passer côté serveur.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" data-close="aiModal">Fermer</button>
+      <button class="btn-primary" id="saveAiConfigBtn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL CONFIRM ═══ -->
+<div id="confirmModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box modal-sm">
+    <div class="modal-head"><h3 id="confirmTitle">Confirmer la suppression</h3></div>
+    <div class="modal-scroll"><p id="confirmMessage" style="color:var(--text2);font-size:14px;line-height:1.6"></p></div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="confirmCancel">Annuler</button>
+      <button class="btn-danger" id="confirmOk">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COMMAND PALETTE ═══ -->
+<div id="commandPalette" class="cmd-palette-backdrop" style="display:none">
+  <div class="cmd-palette-box">
+    <div class="cmd-search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#8E8E93"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="cmdSearch" placeholder="Rechercher une action..." autocomplete="off">
+      <kbd class="cmd-kbd">ESC</kbd>
+    </div>
+    <div class="cmd-items" id="cmdItems"></div>
+  </div>
+</div>
+
+<!-- ═══ TODO PREVIEW TOAST ═══ -->
+<div id="todoPreview" class="todo-preview" style="display:none"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
