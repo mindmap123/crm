@@ -47,10 +47,17 @@ const AI_DEFAULTS = {
     groq: { model: 'llama-3.3-70b-versatile', apiKey: '' },
   },
 };
+const DB_DEFAULTS = {
+  url: '',
+  anonKey: '',
+  workspace: 'atelier-crm',
+};
 let aiConfig = JSON.parse(JSON.stringify(AI_DEFAULTS));
+let dbConfig = { ...DB_DEFAULTS };
 let aiModalProvider = AI_DEFAULTS.provider;
 let aiSpeechRecognition = null;
 let aiSpeechListening = false;
+let remoteSaveTimer = null;
 
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
 function loadData() {
@@ -60,10 +67,11 @@ function loadData() {
   loadTodos();
   loadIdeas();
   loadAiConfig();
+  loadDbConfig();
 }
 
-function saveStudents() { localStorage.setItem('crm_students', JSON.stringify(state.students)); }
-function saveJournal()  { localStorage.setItem('crm_journal',  JSON.stringify(state.journal));  }
+function saveStudents() { localStorage.setItem('crm_students', JSON.stringify(state.students)); queueRemoteSave(); }
+function saveJournal()  { localStorage.setItem('crm_journal',  JSON.stringify(state.journal)); queueRemoteSave(); }
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
@@ -77,11 +85,11 @@ function loadProspects() {
   try { prospects = JSON.parse(localStorage.getItem('crm_prospects') || '[]'); } catch { prospects = []; }
 }
 
-function saveProspects() { localStorage.setItem('crm_prospects', JSON.stringify(prospects)); }
+function saveProspects() { localStorage.setItem('crm_prospects', JSON.stringify(prospects)); queueRemoteSave(); }
 function loadIdeas() {
   try { ideas = JSON.parse(localStorage.getItem('crm_ideas') || '[]'); } catch { ideas = []; }
 }
-function saveIdeas() { localStorage.setItem('crm_ideas', JSON.stringify(ideas)); }
+function saveIdeas() { localStorage.setItem('crm_ideas', JSON.stringify(ideas)); queueRemoteSave(); }
 function loadAiConfig() {
   try {
     const saved = JSON.parse(localStorage.getItem('crm_ai_config') || 'null');
@@ -99,6 +107,16 @@ function loadAiConfig() {
   }
 }
 function saveAiConfig() { localStorage.setItem('crm_ai_config', JSON.stringify(aiConfig)); }
+function loadDbConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('crm_db_config') || 'null');
+    if (!saved) return;
+    dbConfig = { ...DB_DEFAULTS, ...saved };
+  } catch {
+    dbConfig = { ...DB_DEFAULTS };
+  }
+}
+function saveDbConfig() { localStorage.setItem('crm_db_config', JSON.stringify(dbConfig)); }
 
 // ─── TODO LIST ────────────────────────────────────────────────────────────────
 let todos = [];
@@ -107,7 +125,7 @@ function loadTodos() {
   try { todos = JSON.parse(localStorage.getItem('crm_todos') || '[]'); } catch { todos = []; }
 }
 
-function saveTodos() { localStorage.setItem('crm_todos', JSON.stringify(todos)); }
+function saveTodos() { localStorage.setItem('crm_todos', JSON.stringify(todos)); queueRemoteSave(); }
 
 function clearAllData() {
   localStorage.removeItem('crm_students');
@@ -1164,6 +1182,99 @@ function syncTradeSelectors() {
   renderTradeSelector('pfTradeSelector', document.getElementById('pfTrade')?.value || '');
 }
 
+function isDbConfigured() {
+  return Boolean(dbConfig.url && dbConfig.anonKey && dbConfig.workspace);
+}
+
+function getRemoteStatePayload() {
+  return {
+    id: dbConfig.workspace,
+    students: state.students,
+    prospects,
+    todos,
+    ideas,
+    journal: state.journal,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function applyRemoteState(payload) {
+  state.students = Array.isArray(payload.students) ? payload.students : [];
+  prospects = Array.isArray(payload.prospects) ? payload.prospects : [];
+  todos = Array.isArray(payload.todos) ? payload.todos : [];
+  ideas = Array.isArray(payload.ideas) ? payload.ideas : [];
+  state.journal = Array.isArray(payload.journal) ? payload.journal : [];
+  localStorage.setItem('crm_students', JSON.stringify(state.students));
+  localStorage.setItem('crm_journal', JSON.stringify(state.journal));
+  localStorage.setItem('crm_prospects', JSON.stringify(prospects));
+  localStorage.setItem('crm_todos', JSON.stringify(todos));
+  localStorage.setItem('crm_ideas', JSON.stringify(ideas));
+}
+
+function getDbHeaders(extra = {}) {
+  return {
+    apikey: dbConfig.anonKey,
+    Authorization: `Bearer ${dbConfig.anonKey}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  };
+}
+
+function updateDbStatus(message, tone = 'neutral') {
+  const note = document.getElementById('dbStatusNote');
+  if (!note) return;
+  note.textContent = message;
+  note.style.color = tone === 'error' ? 'var(--red)' : tone === 'success' ? 'var(--green)' : 'var(--text2)';
+}
+
+async function loadRemoteState() {
+  if (!isDbConfigured()) return false;
+  try {
+    updateDbStatus('Connexion à la base en cours...');
+    const response = await fetch(`${dbConfig.url}/rest/v1/app_state?id=eq.${encodeURIComponent(dbConfig.workspace)}&select=*`, {
+      headers: getDbHeaders(),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.message || 'Impossible de charger la base');
+    if (Array.isArray(data) && data[0]) {
+      applyRemoteState(data[0]);
+      updateDbStatus('Base connectée. Données partagées chargées.', 'success');
+      return true;
+    }
+    updateDbStatus('Base connectée. Aucune donnée distante trouvée pour ce workspace.', 'success');
+    return false;
+  } catch (error) {
+    updateDbStatus(error.message || 'Erreur de connexion base', 'error');
+    return false;
+  }
+}
+
+async function saveRemoteState() {
+  if (!isDbConfigured()) return;
+  try {
+    const response = await fetch(`${dbConfig.url}/rest/v1/app_state`, {
+      method: 'POST',
+      headers: getDbHeaders({
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      }),
+      body: JSON.stringify([getRemoteStatePayload()]),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.message || 'Impossible de sauvegarder la base');
+    updateDbStatus('Base synchronisée avec succès.', 'success');
+  } catch (error) {
+    updateDbStatus(error.message || 'Erreur de synchronisation base', 'error');
+  }
+}
+
+function queueRemoteSave() {
+  if (!isDbConfigured()) return;
+  window.clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = window.setTimeout(() => {
+    saveRemoteState();
+  }, 700);
+}
+
 function getActiveAiProviderConfig() {
   return aiConfig.providers[aiConfig.provider] || AI_DEFAULTS.providers.openai;
 }
@@ -1177,6 +1288,10 @@ function populateAiModal() {
   document.getElementById('aiModelInput').value = providerConfig.model || '';
   document.getElementById('aiApiKeyInput').value = providerConfig.apiKey || '';
   document.getElementById('aiStyleInput').value = aiConfig.style || '';
+  document.getElementById('dbUrlInput').value = dbConfig.url || '';
+  document.getElementById('dbAnonKeyInput').value = dbConfig.anonKey || '';
+  document.getElementById('dbWorkspaceInput').value = dbConfig.workspace || DB_DEFAULTS.workspace;
+  updateDbStatus(isDbConfigured() ? 'BDD configurée. Tu peux synchroniser ou charger les données partagées.' : 'BDD non configurée. Le CRM fonctionne encore en local sur ce navigateur.');
 }
 
 function openAiModal() {
@@ -1200,8 +1315,14 @@ function saveAiModalConfig() {
   };
   aiConfig.style = document.getElementById('aiStyleInput').value.trim() || AI_DEFAULTS.style;
   saveAiConfig();
+  dbConfig = {
+    url: document.getElementById('dbUrlInput').value.trim().replace(/\/$/, ''),
+    anonKey: document.getElementById('dbAnonKeyInput').value.trim(),
+    workspace: document.getElementById('dbWorkspaceInput').value.trim() || DB_DEFAULTS.workspace,
+  };
+  saveDbConfig();
   closeModal('aiModal');
-  showToast('Configuration IA enregistrée', 'success');
+  showToast('Configuration IA et BDD enregistrée', 'success');
 }
 
 function getAiDraftKey(entityType, id) {
@@ -2166,6 +2287,19 @@ function setupEvents() {
   document.getElementById('openAiConfigHubBtn').addEventListener('click', openAiModal);
   document.getElementById('aiVoiceBtn').addEventListener('click', toggleAiVoiceCapture);
   document.getElementById('saveAiConfigBtn').addEventListener('click', saveAiModalConfig);
+  document.getElementById('syncDbBtn').addEventListener('click', async () => {
+    if (!isWaxx()) return;
+    dbConfig = {
+      url: document.getElementById('dbUrlInput').value.trim().replace(/\/$/, ''),
+      anonKey: document.getElementById('dbAnonKeyInput').value.trim(),
+      workspace: document.getElementById('dbWorkspaceInput').value.trim() || DB_DEFAULTS.workspace,
+    };
+    saveDbConfig();
+    updateDbStatus('Synchronisation en cours...');
+    await saveRemoteState();
+    await loadRemoteState();
+    if (state.currentUser) showView(document.querySelector('.nav-link.active')?.dataset.view || 'dashboard');
+  });
   document.querySelectorAll('#aiProviderTabs .segmented-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       aiModalProvider = btn.dataset.provider;
@@ -2941,9 +3075,14 @@ function showTodoPreview(input) {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-function init() {
-  loadData(); setupEvents();
+async function init() {
+  loadData();
+  setupEvents();
   checkSession() ? showApp() : showLogin();
+  if (isDbConfigured()) {
+    const loaded = await loadRemoteState();
+    if (loaded && state.currentUser) showView(document.querySelector('.nav-link.active')?.dataset.view || 'dashboard');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

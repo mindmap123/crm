@@ -740,8 +740,24 @@
       <div class="detail-notes" style="margin-top:8px">
         Cette V1 stocke la clé API dans le navigateur pour aller vite. Pour une vraie prod, il faudra la passer côté serveur.
       </div>
+      <div class="form-group" style="margin-top:18px">
+        <label>Base de données Supabase</label>
+        <input type="text" id="dbUrlInput" placeholder="https://xxxx.supabase.co">
+      </div>
+      <div class="form-group">
+        <label>Clé anon Supabase</label>
+        <input type="password" id="dbAnonKeyInput" placeholder="Coller la clé anon publique">
+      </div>
+      <div class="form-group">
+        <label>Workspace</label>
+        <input type="text" id="dbWorkspaceInput" placeholder="atelier-crm">
+      </div>
+      <div class="detail-notes" id="dbStatusNote" style="margin-top:8px">
+        BDD non configurée. Le CRM fonctionne encore en local sur ce navigateur.
+      </div>
     </div>
     <div class="modal-foot">
+      <button class="btn-ghost" id="syncDbBtn" type="button">Synchroniser maintenant</button>
       <button class="btn-ghost" data-close="aiModal">Fermer</button>
       <button class="btn-primary" id="saveAiConfigBtn">Enregistrer</button>
     </div>
