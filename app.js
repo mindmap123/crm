@@ -48,8 +48,8 @@ const AI_DEFAULTS = {
   },
 };
 const DB_DEFAULTS = {
-  url: '',
-  anonKey: '',
+  url: 'https://colamwrmztblrsoioers.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvbGFtd3JtenRibHJzb2lvZXJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MjE3NTgsImV4cCI6MjA5MDM5Nzc1OH0.2ozswhNiEbjzTMEDVu9zNwfy8pXJ5gzzWjclq0LDbGg',
   workspace: 'atelier-crm',
 };
 let aiConfig = JSON.parse(JSON.stringify(AI_DEFAULTS));
