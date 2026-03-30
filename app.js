@@ -1456,9 +1456,49 @@ function setAiVoiceStatus(message, isManual = false) {
   else delete status.dataset.manual;
 }
 
-function setupAiVoiceRecognition() {
+function getAiVoiceSupportState() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return false;
+  const hostname = window.location.hostname;
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isSecureEnough = window.isSecureContext || isLocalHost;
+  const isFirefox = /firefox/i.test(navigator.userAgent || '');
+  const hasMediaDevices = Boolean(navigator.mediaDevices?.getUserMedia);
+
+  if (!isSecureEnough) {
+    return {
+      supported: false,
+      reason: 'La dictée vocale demande une page sécurisée en HTTPS.',
+    };
+  }
+
+  if (isFirefox) {
+    return {
+      supported: false,
+      reason: 'Firefox ne gère pas correctement cette dictée web. Utilise plutôt Chrome ou Safari.',
+    };
+  }
+
+  if (!SpeechRecognition) {
+    return {
+      supported: false,
+      reason: 'La dictée native du navigateur n’est pas disponible ici. Essaie avec Chrome ou Safari récent.',
+    };
+  }
+
+  if (!hasMediaDevices) {
+    return {
+      supported: false,
+      reason: 'Le navigateur ne donne pas accès au micro sur cette page.',
+    };
+  }
+
+  return { supported: true, reason: '' };
+}
+
+function setupAiVoiceRecognition() {
+  const support = getAiVoiceSupportState();
+  if (!support.supported) return false;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!aiSpeechRecognition) {
     aiSpeechRecognition = new SpeechRecognition();
     aiSpeechRecognition.lang = 'fr-FR';
@@ -1481,11 +1521,14 @@ function setupAiVoiceRecognition() {
     aiSpeechRecognition.onerror = event => {
       const messages = {
         'not-allowed': 'Le navigateur bloque le micro. Autorise le micro puis réessaie.',
+        'service-not-allowed': 'La reconnaissance vocale n’est pas autorisée dans ce navigateur.',
         'no-speech': 'Aucune voix détectée. Réessaie en parlant un peu plus près du micro.',
         'audio-capture': 'Aucun micro détecté sur cet appareil.',
+        'network': 'Erreur du service de reconnaissance vocale du navigateur.',
+        'aborted': 'Dictée interrompue avant la fin.',
       };
       aiSpeechListening = false;
-      setAiVoiceStatus(messages[event.error] || 'Erreur de dictée vocale.', true);
+      setAiVoiceStatus(messages[event.error] || `Erreur de dictée vocale : ${event.error || 'inconnue'}.`, true);
       renderAiHub();
     };
 
@@ -1497,9 +1540,17 @@ function setupAiVoiceRecognition() {
   return true;
 }
 
-function toggleAiVoiceCapture() {
-  if (!setupAiVoiceRecognition()) {
-    setAiVoiceStatus('La dictée vocale n’est pas disponible dans ce navigateur.', true);
+async function ensureAiMicrophoneAccess() {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('media-devices-unavailable');
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  stream.getTracks().forEach(track => track.stop());
+  return true;
+}
+
+async function toggleAiVoiceCapture() {
+  const support = getAiVoiceSupportState();
+  if (!support.supported || !setupAiVoiceRecognition()) {
+    setAiVoiceStatus(support.reason || 'La dictée vocale n’est pas disponible dans ce navigateur.', true);
     showToast('Dictée vocale non supportée ici', 'warning');
     renderAiHub();
     return;
@@ -1511,9 +1562,22 @@ function toggleAiVoiceCapture() {
   }
 
   try {
+    await ensureAiMicrophoneAccess();
     aiSpeechRecognition.start();
-  } catch {
-    setAiVoiceStatus('La dictée vocale est déjà en cours ou doit être relancée.', true);
+  } catch (error) {
+    if (error?.name === 'NotAllowedError') {
+      setAiVoiceStatus('Le micro est refusé. Autorise le micro dans le navigateur puis réessaie.', true);
+      return;
+    }
+    if (error?.name === 'NotFoundError') {
+      setAiVoiceStatus('Aucun micro détecté sur cet appareil.', true);
+      return;
+    }
+    if (error?.message === 'media-devices-unavailable') {
+      setAiVoiceStatus('Le navigateur ne permet pas de demander l’accès micro sur cette page.', true);
+      return;
+    }
+    setAiVoiceStatus(`La dictée vocale ne peut pas démarrer (${error?.name || 'erreur inconnue'}).`, true);
   }
 }
 
