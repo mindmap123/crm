@@ -440,7 +440,7 @@ function parseNaturalInput(input) {
   const text = input.toLowerCase();
   
   // Time patterns
-  const timeMatch = text.match(/(?:à|a)\s*(\d{1,2})h(\d{2})?/);
+  const timeMatch = text.match(/(?:\b(?:à|a)\s*)?(\d{1,2})h(\d{2})?\b/);
   if (timeMatch) {
     const h = timeMatch[1].padStart(2, '0');
     const m = (timeMatch[2] || '00').padStart(2, '0');
@@ -454,14 +454,26 @@ function parseNaturalInput(input) {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     result.dueDate = tomorrow.toISOString().split('T')[0];
-  } else if (text.match(/lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche\s+prochain/)) {
-    const days = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
-    const dayMatch = text.match(/(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+prochain/);
+  } else if (text.match(/\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+prochain\b/)) {
+    const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const dayMatch = text.match(/\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+prochain\b/);
     if (dayMatch) {
       const targetDay = days.indexOf(dayMatch[1]);
       const currentDay = now.getDay();
       let daysToAdd = targetDay - currentDay;
       if (daysToAdd <= 0) daysToAdd += 7;
+      const target = new Date(now);
+      target.setDate(target.getDate() + daysToAdd);
+      result.dueDate = target.toISOString().split('T')[0];
+    }
+  } else if (text.match(/\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/)) {
+    const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const dayMatch = text.match(/\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/);
+    if (dayMatch) {
+      const targetDay = days.indexOf(dayMatch[1]);
+      const currentDay = now.getDay();
+      let daysToAdd = targetDay - currentDay;
+      if (daysToAdd < 0) daysToAdd += 7;
       const target = new Date(now);
       target.setDate(target.getDate() + daysToAdd);
       result.dueDate = target.toISOString().split('T')[0];
@@ -582,6 +594,35 @@ function createTodo(input, contextType = null, contextId = null) {
   saveTodos();
   logActivity('add', 'todo', todo.title, contextId ? `Tâche liée à ${getContextDisplayName(contextType, contextId)}` : 'Tâche générale');
   clearTodoScheduleSelection();
+  return todo;
+}
+
+function createAiTodo({ title, dueDate = null, dueTime = null, note = '', contextType = null, contextId = null }) {
+  const owner = state.currentUser || ADMINS[0];
+  const todo = {
+    id: generateId(),
+    title,
+    rawInput: note || title,
+    dueDate,
+    dueTime,
+    contextType,
+    contextId,
+    mentions: [],
+    status: 'pending',
+    snoozedUntil: null,
+    priority: 'normal',
+    createdAt: Date.now(),
+    createdBy: owner.id,
+    ownerId: owner.id,
+    ownerName: owner.name,
+    completedAt: null,
+  };
+  todos.unshift(todo);
+  saveTodos();
+  logActivity('add', 'todo', todo.title, contextId ? `Tâche liée à ${getContextDisplayName(contextType, contextId)}` : 'Tâche créée depuis l’atelier IA');
+  renderTodos();
+  renderDashboard();
+  updateTodoBadges();
   return todo;
 }
 
@@ -1648,6 +1689,30 @@ function upsertCrmRecordFromAi(parsed) {
   return { entityType: 'prospect', name: prospect.name, action: existingIndex >= 0 ? 'updated' : 'created' };
 }
 
+function parseNextStepResult(aiText, noteText) {
+  const noteParsed = parseNaturalInput(noteText || '');
+  const aiParsed = parseNaturalInput(aiText || '');
+  const action = extractLabeledValue(aiText, 'Action prioritaire') || '';
+  const when = extractLabeledValue(aiText, 'Quand le faire') || '';
+  const why = extractLabeledValue(aiText, 'Pourquoi') || '';
+  const phoneScript = extractLabeledValue(aiText, 'Texte court à dire au téléphone') || '';
+  const fallbackName = extractContactDetails(noteText || '').name;
+  const title = action
+    || (fallbackName ? `Appeler ${fallbackName}` : '')
+    || (noteText ? noteText.trim() : 'Prochaine action');
+  const dueDate = noteParsed.dueDate || aiParsed.dueDate || null;
+  const dueTime = noteParsed.dueTime || aiParsed.dueTime || null;
+  const details = [why, phoneScript].filter(Boolean).join(' · ');
+
+  return {
+    title,
+    dueDate,
+    dueTime,
+    details,
+    when,
+  };
+}
+
 function renderAiHub() {
   const providerLabel = document.getElementById('aiHubProviderLabel');
   if (providerLabel) providerLabel.textContent = aiConfig.provider.toUpperCase();
@@ -1872,6 +1937,18 @@ async function runAiWorkspaceAction(kind) {
       const result = upsertCrmRecordFromAi(parsed);
       finalText = `${finalText}\n\nFiche ${result.entityType === 'student' ? 'client' : 'lead'} ${result.action === 'created' ? 'créée' : 'mise à jour'} dans ${result.entityType === 'student' ? 'Clients' : 'Leads'} : ${result.name}`;
       showToast(`${result.entityType === 'student' ? 'Client' : 'Lead'} ${result.action === 'created' ? 'créé' : 'mis à jour'} : ${result.name}`, 'success');
+    }
+
+    if (kind === 'next-step') {
+      const parsed = parseNextStepResult(finalText, payload.note);
+      const todo = createAiTodo({
+        title: parsed.title,
+        dueDate: parsed.dueDate,
+        dueTime: parsed.dueTime,
+        note: [payload.note, parsed.details].filter(Boolean).join('\n\n'),
+      });
+      finalText = `${finalText}\n\nTâche créée dans Suivi : ${todo.title}${todo.dueDate ? ` · ${formatDate(todo.dueDate)}` : ''}${todo.dueTime ? ` · ${todo.dueTime}` : ''}`;
+      showToast(`Tâche créée : ${todo.title}`, 'success');
     }
 
     state.aiWorkspaceResult = { loading: false, text: finalText, error: '' };
