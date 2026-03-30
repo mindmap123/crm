@@ -1428,7 +1428,7 @@ function buildAiWorkspacePayload() {
 function buildAiWorkspacePrompt(kind, payload) {
   const intro = `${aiConfig.style || AI_DEFAULTS.style} Réponds en français. Sois concret, direct et très utile pour une équipe terrain.`;
   const tasks = {
-    intake: `Transforme cette note brute en fiche lead exploitable. Réponds avec ce format exact: Nom probable, Métier probable, Source probable, Statut conseillé, Prochaine action, Date/heure suggérée, Notes propres.`,
+    intake: `Transforme cette note brute en fiche CRM exploitable. Si la personne est deja signee, deja inscrite, deja eleve ou deja cliente, traite-la comme client. Sinon traite-la comme lead. Réponds avec ce format exact: Type de fiche, Nom probable, Métier probable, Source probable, Statut conseillé, Prochaine action, Date/heure suggérée, Notes propres.`,
     qualify: `Qualifie ce lead. Réponds avec ce format exact: Niveau du lead, Objections probables, Angle de relance, Risque principal, Signal d'achat.`,
     'next-step': `Dis quoi faire maintenant. Réponds avec ce format exact: Action prioritaire, Quand le faire, Pourquoi, Texte court à dire au téléphone.`,
     message: `Rédige un message court prêt à envoyer. Commence directement par le message, ton simple, humain, terrain, sans explication annexe.`,
@@ -1438,6 +1438,214 @@ function buildAiWorkspacePrompt(kind, payload) {
     system: intro,
     user: `${tasks[kind]}\n\nContexte CRM:\n${JSON.stringify(payload, null, 2)}`,
   };
+}
+
+function getCurrentDateParts() {
+  const now = new Date();
+  return {
+    now,
+    date: now.toISOString().split('T')[0],
+  };
+}
+
+function normalizePhone(phone) {
+  return (phone || '').replace(/[^\d+]/g, '');
+}
+
+function extractLabeledValue(text, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = (text || '').match(new RegExp(`${escaped}\\s*:\\s*(.+)`, 'i'));
+  return match?.[1]?.split('\n')[0]?.trim() || '';
+}
+
+function detectTradeValue(text) {
+  const value = (text || '').toLowerCase();
+  if (value.includes('maçon') || value.includes('macon')) return 'macon';
+  if (value.includes('plombier')) return 'plombier';
+  if (value.includes('serrurier')) return 'serrurier';
+  if (value.includes('plaquiste')) return 'plaquiste';
+  if (value.includes('charpentier')) return 'charpentier';
+  if (value.includes('autre')) return 'autre';
+  return '';
+}
+
+function detectSourceValue(text) {
+  const value = (text || '').toLowerCase();
+  const sourceMap = [
+    ['tiktok commentaire', 'TikTok commentaire'],
+    ['tiktok comment', 'TikTok commentaire'],
+    ['tiktok live', 'TikTok live'],
+    ['tiktok ads', 'TikTok ads'],
+    ['instagram ads', 'Instagram ads'],
+    ['instagram', 'Instagram'],
+    ['podcast', 'Podcast'],
+    ['youtube', 'YouTube'],
+    ['bouche à oreille', 'Bouche à oreille'],
+    ['bouche a oreille', 'Bouche à oreille'],
+    ['référence client', 'Référence client'],
+    ['reference client', 'Référence client'],
+  ];
+  return sourceMap.find(([needle]) => value.includes(needle))?.[1] || '';
+}
+
+function detectEntityType(text) {
+  const value = (text || '').toLowerCase();
+  if (value.includes('type de fiche') && value.includes('client')) return 'student';
+  if (/(devenu élève|devenu eleve|eleve de la formation|élève de la formation|déjà client|deja client|inscrit aujourd'hui|inscrit aujourd’hui|a signé|a signe|client signé|client signe)/i.test(text || '')) {
+    return 'student';
+  }
+  return 'prospect';
+}
+
+function detectProspectStatus(text) {
+  const value = (text || '').toLowerCase();
+  if (value.includes('signé') || value.includes('signe') || value.includes('client signé') || value.includes('client signe')) return 'signe';
+  if (value.includes('chaud') || value.includes('qualifié') || value.includes('qualifie') || value.includes('1er contact')) return 'chaud';
+  return 'froid';
+}
+
+function detectPaymentMethod(text) {
+  const value = (text || '').toLowerCase();
+  if (value.includes('skool') || value.includes('stripe')) return 'Skool / Stripe';
+  if (value.includes('rib') || value.includes('virement')) return 'RIB';
+  return '';
+}
+
+function extractContactDetails(text) {
+  const source = text || '';
+  const email = source.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.trim() || '';
+  const phone = source.match(/(?:\+33|0)[\s.()-]*\d(?:[\s.()-]*\d){8,}/)?.[0]?.trim() || '';
+  let name = extractLabeledValue(source, 'Nom probable');
+
+  if (!name) {
+    const cleaned = source
+      .replace(email, ' ')
+      .replace(phone, ' ')
+      .replace(/\bil est devenu.+$/i, ' ')
+      .replace(/\best devenu.+$/i, ' ')
+      .trim();
+    name = cleaned.match(/([A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:\s+[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’-]+){1,2})/)?.[1]?.trim() || '';
+  }
+
+  return { name, email, phone };
+}
+
+function parseIntakeResult(aiText, noteText) {
+  const combined = [aiText || '', noteText || ''].filter(Boolean).join('\n');
+  const contact = extractContactDetails(noteText || aiText || '');
+  const notes = extractLabeledValue(aiText, 'Notes propres');
+  const action = extractLabeledValue(aiText, 'Prochaine action');
+  const schedule = extractLabeledValue(aiText, 'Date/heure suggérée');
+  const scheduleMatch = schedule.match(/(\d{1,2})[:hH](\d{2})?/);
+  const reminderTime = scheduleMatch
+    ? `${String(Number(scheduleMatch[1])).padStart(2, '0')}:${String(scheduleMatch[2] || '00').padStart(2, '0')}`
+    : '';
+
+  return {
+    entityType: detectEntityType(`${extractLabeledValue(aiText, 'Type de fiche')}\n${combined}`),
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    trade: detectTradeValue(`${extractLabeledValue(aiText, 'Métier probable')}\n${combined}`),
+    source: detectSourceValue(`${extractLabeledValue(aiText, 'Source probable')}\n${combined}`),
+    prospectStatus: detectProspectStatus(`${extractLabeledValue(aiText, 'Statut conseillé')}\n${combined}`),
+    reminderNote: action || '',
+    reminderDate: /demain/i.test(schedule) ? new Date(Date.now() + 86400000).toISOString().split('T')[0] : getCurrentDateParts().date,
+    reminderTime,
+    notes: [notes, noteText].filter(Boolean).join('\n\n').trim(),
+    method: detectPaymentMethod(combined),
+  };
+}
+
+function upsertCrmRecordFromAi(parsed) {
+  if (!parsed.name || !parsed.phone) {
+    throw new Error('La note doit contenir au minimum un nom et un numéro de téléphone pour créer une fiche.');
+  }
+
+  const owner = state.currentUser || ADMINS[0];
+  const phoneKey = normalizePhone(parsed.phone);
+  const emailKey = (parsed.email || '').trim().toLowerCase();
+
+  if (parsed.entityType === 'student') {
+    const existingIndex = state.students.findIndex(item =>
+      (phoneKey && normalizePhone(item.phone) === phoneKey) ||
+      (emailKey && (item.email || '').trim().toLowerCase() === emailKey)
+    );
+    const previous = existingIndex >= 0 ? state.students[existingIndex] : null;
+    const student = {
+      id: previous?.id || generateId(),
+      name: parsed.name,
+      email: parsed.email,
+      phone: parsed.phone,
+      trade: parsed.trade || previous?.trade || '',
+      skoolDate: previous?.skoolDate || getCurrentDateParts().date,
+      amount: previous?.amount || '',
+      method: parsed.method || previous?.method || '',
+      color: previous?.color || 'green',
+      website: previous?.website || false,
+      gmb: previous?.gmb || false,
+      logo: previous?.logo || false,
+      active: true,
+      notes: parsed.notes || previous?.notes || '',
+      photo: previous?.photo || null,
+      source: parsed.source || previous?.source || '',
+      originProspectId: previous?.originProspectId || '',
+      convertedAt: previous?.convertedAt || Date.now(),
+      createdAt: previous?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    if (existingIndex >= 0) {
+      state.students[existingIndex] = student;
+      logAction('edit', student.name, 'Client mis à jour depuis l’atelier IA');
+      logActivity('edit', 'student', student.name, 'Client mis à jour depuis l’atelier IA');
+    } else {
+      state.students.unshift(student);
+      logAction('add', student.name, 'Client créé depuis l’atelier IA');
+      logActivity('add', 'student', student.name, 'Client créé depuis l’atelier IA');
+    }
+
+    saveStudents();
+    renderStudents();
+    renderDashboard();
+    return { entityType: 'student', name: student.name, action: existingIndex >= 0 ? 'updated' : 'created' };
+  }
+
+  const existingIndex = prospects.findIndex(item =>
+    (phoneKey && normalizePhone(item.phone) === phoneKey) ||
+    (emailKey && (item.email || '').trim().toLowerCase() === emailKey)
+  );
+  const previous = existingIndex >= 0 ? prospects[existingIndex] : null;
+  const prospect = {
+    id: previous?.id || generateId(),
+    name: parsed.name,
+    phone: parsed.phone,
+    email: parsed.email,
+    trade: parsed.trade || previous?.trade || '',
+    source: parsed.source || previous?.source || '',
+    ownerId: previous?.ownerId || owner.id,
+    ownerName: previous?.ownerName || owner.name,
+    status: parsed.prospectStatus || previous?.status || 'froid',
+    reminderDate: parsed.reminderDate || previous?.reminderDate || '',
+    reminderTime: parsed.reminderTime || previous?.reminderTime || '',
+    reminderNote: parsed.reminderNote || previous?.reminderNote || '',
+    notes: parsed.notes || previous?.notes || '',
+    createdAt: previous?.createdAt || Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  if (existingIndex >= 0) {
+    prospects[existingIndex] = prospect;
+    logActivity('edit', 'prospect', prospect.name, 'Lead mis à jour depuis l’atelier IA');
+  } else {
+    prospects.unshift(prospect);
+    logActivity('add', 'prospect', prospect.name, `Lead créé depuis l’atelier IA · Étape : ${getProspectStatusMeta(prospect.status).label}`);
+  }
+
+  saveProspects();
+  renderProspects();
+  renderDashboard();
+  return { entityType: 'prospect', name: prospect.name, action: existingIndex >= 0 ? 'updated' : 'created' };
 }
 
 function renderAiHub() {
@@ -1657,7 +1865,16 @@ async function runAiWorkspaceAction(kind) {
   try {
     const { system, user } = buildAiWorkspacePrompt(kind, payload);
     const text = await requestAiCompletion(system, user);
-    state.aiWorkspaceResult = { loading: false, text: text || 'Aucune réponse.', error: '' };
+    let finalText = text || 'Aucune réponse.';
+
+    if (kind === 'intake') {
+      const parsed = parseIntakeResult(finalText, payload.note);
+      const result = upsertCrmRecordFromAi(parsed);
+      finalText = `${finalText}\n\nFiche ${result.entityType === 'student' ? 'client' : 'lead'} ${result.action === 'created' ? 'créée' : 'mise à jour'} dans ${result.entityType === 'student' ? 'Clients' : 'Leads'} : ${result.name}`;
+      showToast(`${result.entityType === 'student' ? 'Client' : 'Lead'} ${result.action === 'created' ? 'créé' : 'mis à jour'} : ${result.name}`, 'success');
+    }
+
+    state.aiWorkspaceResult = { loading: false, text: finalText, error: '' };
   } catch (error) {
     state.aiWorkspaceResult = { loading: false, text: '', error: error.message || 'Erreur IA' };
     showToast(error.message || 'Erreur IA', 'warning');
