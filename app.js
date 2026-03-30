@@ -2001,6 +2001,8 @@ function renderDashboard() {
   const s = state.students;
   const activePipeline = prospects.filter(p => p.status !== 'signe').length;
   const activeClients = s.filter(x => x.active).length;
+  const upcomingAgenda = getDashboardAgendaItems();
+  const nextAgenda = upcomingAgenda[0] || null;
   const todayActions = getTodayTodos().length + prospects.filter(p => p.reminderDate === new Date().toISOString().split('T')[0]).length;
   document.getElementById('todayDate').textContent =
     new Date().toLocaleDateString('fr-FR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
@@ -2027,7 +2029,7 @@ function renderDashboard() {
     </div>
     <div class="stat-card">
       <div class="stat-icon purple">📅</div>
-      <div><div class="stat-value">${todayActions}</div><div class="stat-label">Actions du jour</div><span class="stat-trend trend-flat">${activeClients} clients actifs</span></div>
+      <div><div class="stat-value">${upcomingAgenda.length}</div><div class="stat-label">Rendez-vous à venir</div><span class="stat-trend trend-flat">${nextAgenda ? `${nextAgenda.timeLabel} · ${nextAgenda.title}` : `${activeClients} clients actifs`}</span></div>
     </div>
   `;
   renderDashboardBoards();
@@ -2047,6 +2049,47 @@ function renderDashboard() {
   }
 
   renderDashboardReminders();
+}
+
+function getDashboardAgendaItems() {
+  const now = new Date();
+  const leadItems = prospects
+    .filter(item => item.reminderDate)
+    .map(item => {
+      const startsAt = new Date(`${item.reminderDate}T${item.reminderTime || '09:00'}:00`);
+      return {
+        type: 'prospect',
+        id: item.id,
+        startsAt,
+        dateLabel: formatDate(item.reminderDate),
+        timeLabel: item.reminderTime || '09:00',
+        title: item.name,
+        subtitle: item.reminderNote || 'Relance lead',
+        badge: 'Lead',
+      };
+    })
+    .filter(item => item.startsAt.getTime() >= now.getTime() - 3600000);
+
+  const todoItems = todos
+    .filter(item => item.status === 'pending' && item.dueDate)
+    .map(item => {
+      const startsAt = new Date(`${item.dueDate}T${item.dueTime || '09:00'}:00`);
+      return {
+        type: 'todo',
+        id: item.id,
+        startsAt,
+        dateLabel: formatDate(item.dueDate),
+        timeLabel: item.dueTime || '09:00',
+        title: item.title,
+        subtitle: getContextDisplayName(item.contextType, item.contextId) || 'Tâche équipe',
+        badge: 'Tâche',
+      };
+    })
+    .filter(item => item.startsAt.getTime() >= now.getTime() - 3600000);
+
+  return [...leadItems, ...todoItems]
+    .sort((a, b) => a.startsAt - b.startsAt)
+    .slice(0, 5);
 }
 
 function renderDashboardBoards() {
@@ -3162,34 +3205,25 @@ function prospectCardHtml(p) {
 }
 
 function renderDashboardReminders() {
-  const now = new Date();
-  const today = startOfDay(now);
-  const todayReminders = prospects.filter(p => {
-    if (!p.reminderDate) return false;
-    const reminderDt = new Date(p.reminderDate + 'T' + (p.reminderTime || '00:00'));
-    return reminderDt >= today && reminderDt < new Date(today.getTime() + 86400000);
-  }).sort((a,b) => {
-    const aTime = a.reminderTime || '00:00';
-    const bTime = b.reminderTime || '00:00';
-    return aTime.localeCompare(bTime);
-  });
-  
+  const agendaItems = getDashboardAgendaItems();
   const section = document.getElementById('remindersSection');
   const list = document.getElementById('remindersList');
   
-  if (todayReminders.length === 0) {
+  if (agendaItems.length === 0) {
     section.style.display = 'none';
   } else {
     section.style.display = 'block';
-    list.innerHTML = todayReminders.map(p => `
-      <div class="reminder-item" data-id="${esc(p.id)}">
-        <div class="reminder-time">${p.reminderTime || '—'}</div>
+    list.innerHTML = agendaItems.map(item => `
+      <div class="reminder-item" ${item.type === 'prospect' ? `data-id="${esc(item.id)}"` : `data-dashboard-todo="${esc(item.id)}"`}>
+        <div class="reminder-time">${esc(item.timeLabel)}</div>
         <div class="reminder-content">
-          <div class="reminder-name">${esc(p.name)}</div>
-          ${p.reminderNote ? `<div class="reminder-note">${esc(p.reminderNote)}</div>` : ''}
+          <div class="reminder-name">${esc(item.title)} <span class="reminder-badge">${esc(item.badge)}</span></div>
+          <div class="reminder-note">${esc(item.dateLabel)} · ${esc(item.subtitle)}</div>
         </div>
-        <button class="agenda-btn" data-agenda-lead="${esc(p.id)}">Agenda</button>
-        <button class="reminder-call-btn" data-id="${esc(p.id)}">📞</button>
+        ${item.type === 'prospect'
+          ? `<button class="agenda-btn" data-agenda-lead="${esc(item.id)}">Agenda</button><button class="reminder-call-btn" data-id="${esc(item.id)}">📞</button>`
+          : `<button class="agenda-btn" data-agenda-todo="${esc(item.id)}">Agenda</button><button class="btn-ghost" type="button" data-view="todos">Voir</button>`
+        }
       </div>
     `).join('');
   }
