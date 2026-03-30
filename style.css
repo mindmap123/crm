@@ -728,10 +728,13 @@ body {
 .reminder-item { display: flex; align-items: center; gap: 16px; background: var(--card); padding: 16px 18px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s; }
 .reminder-item:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
 .reminder-badge { display: inline-flex; align-items: center; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: rgba(255, 90, 31, 0.10); color: var(--blue); font-size: 11px; font-weight: 700; vertical-align: middle; }
+.reminder-time-block { min-width: 88px; display: flex; flex-direction: column; gap: 4px; }
 .reminder-time { font-size: 13px; font-weight: 700; color: var(--blue); min-width: 50px; }
+.reminder-date { font-size: 11px; color: var(--text3); }
 .reminder-content { flex: 1; min-width: 0; }
 .reminder-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 .reminder-note { font-size: 11px; color: var(--text2); }
+.reminder-more-row { display: flex; justify-content: center; padding-top: 4px; }
 .reminder-call-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--blue); border: none; color: white; font-size: 16px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
 .reminder-call-btn:hover { background: #0066D6; transform: scale(1.05); }
 .reminder-call-btn:active { transform: scale(0.95); }

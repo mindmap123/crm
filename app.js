@@ -1471,7 +1471,7 @@ function buildAiWorkspacePrompt(kind, payload) {
   const tasks = {
     intake: `Transforme cette note brute en fiche CRM exploitable. Si la personne est deja signee, deja inscrite, deja eleve ou deja cliente, traite-la comme client. Sinon traite-la comme lead. Réponds avec ce format exact: Type de fiche, Nom probable, Métier probable, Source probable, Statut conseillé, Prochaine action, Date/heure suggérée, Notes propres.`,
     qualify: `Qualifie ce lead. Réponds avec ce format exact: Niveau du lead, Objections probables, Angle de relance, Risque principal, Signal d'achat.`,
-    'next-step': `Dis quoi faire maintenant. Réponds avec ce format exact: Action prioritaire, Quand le faire, Pourquoi, Texte court à dire au téléphone.`,
+    'next-step': `Dis quoi faire maintenant. La note brute prime toujours sur la base CRM. Si la note mentionne Thomas, ne réponds jamais Karim ou un autre nom pris dans les données. Réponds avec ce format exact: Action prioritaire, Quand le faire, Pourquoi, Texte court à dire au téléphone.`,
     message: `Rédige un message court prêt à envoyer. Commence directement par le message, ton simple, humain, terrain, sans explication annexe.`,
     business: `Lis les données CRM fournies et donne seulement 3 insights utiles. Pour chaque insight: constat, impact, action recommandée.`,
   };
@@ -1557,6 +1557,11 @@ function extractContactDetails(text) {
   const email = source.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.trim() || '';
   const phone = source.match(/(?:\+33|0)[\s.()-]*\d(?:[\s.()-]*\d){8,}/)?.[0]?.trim() || '';
   let name = extractLabeledValue(source, 'Nom probable');
+
+  if (!name) {
+    const actionName = source.match(/\b(?:appeler|rappeler|revoir|contacter|call avec|call)\s+([A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’-]+)/i)?.[1];
+    if (actionName) name = actionName.trim();
+  }
 
   if (!name) {
     const cleaned = source
@@ -1697,8 +1702,9 @@ function parseNextStepResult(aiText, noteText) {
   const why = extractLabeledValue(aiText, 'Pourquoi') || '';
   const phoneScript = extractLabeledValue(aiText, 'Texte court à dire au téléphone') || '';
   const fallbackName = extractContactDetails(noteText || '').name;
-  const title = action
-    || (fallbackName ? `Appeler ${fallbackName}` : '')
+  const noteDrivenTitle = fallbackName ? `Appeler ${fallbackName}` : '';
+  const title = noteDrivenTitle
+    || action
     || (noteText ? noteText.trim() : 'Prochaine action');
   const dueDate = noteParsed.dueDate || aiParsed.dueDate || null;
   const dueTime = noteParsed.dueTime || aiParsed.dueTime || null;
@@ -3213,19 +3219,26 @@ function renderDashboardReminders() {
     section.style.display = 'none';
   } else {
     section.style.display = 'block';
-    list.innerHTML = agendaItems.map(item => `
+    const visibleItems = agendaItems.slice(0, 3);
+    list.innerHTML = `
+      ${visibleItems.map(item => `
       <div class="reminder-item" ${item.type === 'prospect' ? `data-id="${esc(item.id)}"` : `data-dashboard-todo="${esc(item.id)}"`}>
-        <div class="reminder-time">${esc(item.timeLabel)}</div>
+        <div class="reminder-time-block">
+          <div class="reminder-time">${esc(item.timeLabel)}</div>
+          <div class="reminder-date">${esc(item.dateLabel)}</div>
+        </div>
         <div class="reminder-content">
           <div class="reminder-name">${esc(item.title)} <span class="reminder-badge">${esc(item.badge)}</span></div>
-          <div class="reminder-note">${esc(item.dateLabel)} · ${esc(item.subtitle)}</div>
+          <div class="reminder-note">${esc(item.subtitle)}</div>
         </div>
         ${item.type === 'prospect'
           ? `<button class="agenda-btn" data-agenda-lead="${esc(item.id)}">Agenda</button><button class="reminder-call-btn" data-id="${esc(item.id)}">📞</button>`
           : `<button class="agenda-btn" data-agenda-todo="${esc(item.id)}">Agenda</button><button class="btn-ghost" type="button" data-view="todos">Voir</button>`
         }
       </div>
-    `).join('');
+    `).join('')}
+      ${agendaItems.length > 3 ? `<div class="reminder-more-row"><button class="btn-ghost" type="button" data-view="todos">Voir plus (${agendaItems.length - 3})</button></div>` : ''}
+    `;
   }
 }
 
