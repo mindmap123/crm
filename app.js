@@ -57,6 +57,8 @@ let dbConfig = { ...DB_DEFAULTS };
 let aiModalProvider = AI_DEFAULTS.provider;
 let aiSpeechRecognition = null;
 let aiSpeechListening = false;
+let aiSpeechShouldContinue = false;
+let aiSpeechCommittedText = '';
 let remoteSaveTimer = null;
 
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
@@ -1503,19 +1505,34 @@ function setupAiVoiceRecognition() {
     aiSpeechRecognition = new SpeechRecognition();
     aiSpeechRecognition.lang = 'fr-FR';
     aiSpeechRecognition.interimResults = true;
-    aiSpeechRecognition.continuous = false;
+    aiSpeechRecognition.continuous = true;
 
     aiSpeechRecognition.onstart = () => {
       aiSpeechListening = true;
-      setAiVoiceStatus('Écoute en cours... parle naturellement.', true);
+      setAiVoiceStatus('Écoute en cours... le micro reste actif jusqu’à Stop micro.', true);
       renderAiHub();
     };
 
     aiSpeechRecognition.onresult = event => {
-      const transcript = Array.from(event.results).map(result => result[0]?.transcript || '').join(' ').trim();
       const input = document.getElementById('aiWorkspaceInput');
-      if (input && transcript) input.value = transcript;
-      setAiVoiceStatus('Transcription ajoutée dans l’atelier IA. Tu peux maintenant lancer une action.', true);
+      if (!input) return;
+
+      let finalChunk = '';
+      let interimChunk = '';
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcript = event.results[index][0]?.transcript || '';
+        if (!transcript) continue;
+        if (event.results[index].isFinal) finalChunk += `${transcript} `;
+        else interimChunk += `${transcript} `;
+      }
+
+      if (finalChunk.trim()) {
+        aiSpeechCommittedText = `${aiSpeechCommittedText} ${finalChunk}`.trim();
+      }
+
+      input.value = [aiSpeechCommittedText, interimChunk.trim()].filter(Boolean).join(' ').trim();
+      setAiVoiceStatus('Dictée en cours... tu peux continuer à parler ou cliquer sur Stop micro.', true);
     };
 
     aiSpeechRecognition.onerror = event => {
@@ -1527,6 +1544,7 @@ function setupAiVoiceRecognition() {
         'network': 'Erreur du service de reconnaissance vocale du navigateur.',
         'aborted': 'Dictée interrompue avant la fin.',
       };
+      aiSpeechShouldContinue = false;
       aiSpeechListening = false;
       setAiVoiceStatus(messages[event.error] || `Erreur de dictée vocale : ${event.error || 'inconnue'}.`, true);
       renderAiHub();
@@ -1534,6 +1552,20 @@ function setupAiVoiceRecognition() {
 
     aiSpeechRecognition.onend = () => {
       aiSpeechListening = false;
+      if (aiSpeechShouldContinue) {
+        setAiVoiceStatus('Pause détectée... reprise de l’écoute.', true);
+        renderAiHub();
+        window.setTimeout(() => {
+          if (!aiSpeechShouldContinue) return;
+          try {
+            aiSpeechRecognition.start();
+          } catch {
+            setAiVoiceStatus('La dictée s’est arrêtée. Reclique sur Micro pour reprendre.', true);
+            renderAiHub();
+          }
+        }, 180);
+        return;
+      }
       renderAiHub();
     };
   }
@@ -1557,14 +1589,20 @@ async function toggleAiVoiceCapture() {
   }
 
   if (aiSpeechListening) {
+    aiSpeechShouldContinue = false;
     aiSpeechRecognition.stop();
+    setAiVoiceStatus('Dictée arrêtée. Tu peux lancer une action IA sur le texte capturé.', true);
     return;
   }
 
   try {
     await ensureAiMicrophoneAccess();
+    const input = document.getElementById('aiWorkspaceInput');
+    aiSpeechCommittedText = input?.value?.trim() || '';
+    aiSpeechShouldContinue = true;
     aiSpeechRecognition.start();
   } catch (error) {
+    aiSpeechShouldContinue = false;
     if (error?.name === 'NotAllowedError') {
       setAiVoiceStatus('Le micro est refusé. Autorise le micro dans le navigateur puis réessaie.', true);
       return;
