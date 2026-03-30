@@ -60,6 +60,7 @@ let aiSpeechListening = false;
 let aiSpeechShouldContinue = false;
 let aiSpeechCommittedText = '';
 let remoteSaveTimer = null;
+let todoLeadModalTodoId = null;
 
 function mergeAiConfig(saved) {
   return {
@@ -626,6 +627,83 @@ function createAiTodo({ title, dueDate = null, dueTime = null, note = '', contex
   return todo;
 }
 
+function openTodoLeadModal(todoId) {
+  const todo = todos.find(item => item.id === todoId);
+  if (!todo) return;
+  todoLeadModalTodoId = todoId;
+  const select = document.getElementById('todoLeadSelect');
+  const statusSelect = document.getElementById('todoLeadStatusSelect');
+  const summary = document.getElementById('todoLeadTaskSummary');
+  if (!select || !statusSelect || !summary) return;
+
+  summary.textContent = todo.title;
+  select.innerHTML = `<option value="">— Choisir un lead —</option>${
+    prospects.map(prospect => `<option value="${esc(prospect.id)}">${esc(prospect.name)} · ${esc(prospect.phone || 'sans numéro')}</option>`).join('')
+  }`;
+  select.value = todo.contextType === 'prospect' ? (todo.contextId || '') : '';
+  statusSelect.value = todo.contextType === 'prospect'
+    ? (prospects.find(item => item.id === todo.contextId)?.status || '')
+    : 'chaud';
+  openModal('todoLeadModal');
+}
+
+function saveTodoLeadLink() {
+  const todo = todos.find(item => item.id === todoLeadModalTodoId);
+  if (!todo) return;
+  const leadId = document.getElementById('todoLeadSelect')?.value || '';
+  const nextStatus = document.getElementById('todoLeadStatusSelect')?.value || '';
+  if (!leadId) {
+    showToast('Choisis un lead ou crée-en un depuis cette note.', 'warning');
+    return;
+  }
+
+  const prospect = prospects.find(item => item.id === leadId);
+  if (!prospect) {
+    showToast('Lead introuvable.', 'warning');
+    return;
+  }
+
+  todo.contextType = 'prospect';
+  todo.contextId = leadId;
+  if (nextStatus && prospect.status !== nextStatus) {
+    prospect.status = nextStatus;
+    prospect.updatedAt = Date.now();
+    logActivity('edit', 'prospect', prospect.name, `Étape mise à jour depuis le suivi vers ${getProspectStatusMeta(nextStatus).label}`);
+    saveProspects();
+  }
+  saveTodos();
+  closeModal('todoLeadModal');
+  renderTodos();
+  renderProspects();
+  renderDashboard();
+  showToast('Tâche liée et lead mis à jour', 'success');
+}
+
+function createLeadFromTodo() {
+  const todo = todos.find(item => item.id === todoLeadModalTodoId);
+  if (!todo) return;
+  const parsed = parseIntakeResult('', todo.rawInput || todo.title);
+  if (!parsed.name || !parsed.phone) {
+    showToast('Il faut au minimum un nom et un numéro dans la note pour créer un lead.', 'warning');
+    return;
+  }
+  parsed.entityType = 'prospect';
+  parsed.prospectStatus = document.getElementById('todoLeadStatusSelect')?.value || 'chaud';
+  const result = upsertCrmRecordFromAi(parsed);
+  const prospect = prospects.find(item => item.name === result.name) || prospects.find(item => normalizePhone(item.phone) === normalizePhone(parsed.phone));
+  const todoRef = todos.find(item => item.id === todoLeadModalTodoId);
+  if (todoRef && prospect) {
+    todoRef.contextType = 'prospect';
+    todoRef.contextId = prospect.id;
+    saveTodos();
+  }
+  closeModal('todoLeadModal');
+  renderTodos();
+  renderProspects();
+  renderDashboard();
+  showToast(`Lead créé depuis le suivi : ${result.name}`, 'success');
+}
+
 function toggleTodo(id) {
   const todo = todos.find(t => t.id === id);
   if (!todo) return;
@@ -894,6 +972,7 @@ function todoItemHtml(todo) {
   const contextLabel = todo.contextType === 'prospect' ? '👤 Lead' : todo.contextType === 'student' ? '🎓 Client' : '';
   const contextName = getContextDisplayName(todo.contextType, todo.contextId);
   const ownerName = getTodoOwnerName(todo);
+  const leadActionLabel = todo.contextType === 'prospect' ? 'Qualifier' : 'Lier lead';
   
   return `
     <div class="todo-item ${todo.status}" data-id="${esc(todo.id)}">
@@ -912,11 +991,8 @@ function todoItemHtml(todo) {
       </div>
       <div class="todo-actions">
         ${todo.dueDate ? `<button class="agenda-btn" data-agenda-todo="${esc(todo.id)}" title="Agenda Apple">Agenda</button>` : ''}
-        <button class="todo-action-btn" type="button" data-todo-snooze="${esc(todo.id)}" data-snooze-days="1" title="Demain">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm1-11h-2v6l5.25 3.15.75-1.23-4-2.42V9z"/></svg>
-        </button>
-        <button class="todo-action-btn" type="button" data-todo-snooze="${esc(todo.id)}" data-snooze-days="7" title="Semaine prochaine">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+        <button class="todo-action-btn todo-link-btn" type="button" data-todo-link="${esc(todo.id)}" title="${esc(leadActionLabel)}">
+          ${esc(leadActionLabel)}
         </button>
         <button class="todo-action-btn todo-delete" type="button" data-todo-delete="${esc(todo.id)}" title="Supprimer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -2695,6 +2771,7 @@ function closeModal(id) {
   document.getElementById(id).style.display='none';
   if (id === 'detailModal') state.viewingId = null;
   if (id === 'prospectDetailModal') state.viewingProspectId = null;
+  if (id === 'todoLeadModal') todoLeadModalTodoId = null;
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
@@ -2758,6 +2835,8 @@ function setupEvents() {
   document.getElementById('openAiConfigHubBtn').addEventListener('click', openAiModal);
   document.getElementById('aiVoiceBtn').addEventListener('click', toggleAiVoiceCapture);
   document.getElementById('saveAiConfigBtn').addEventListener('click', saveAiModalConfig);
+  document.getElementById('todoLeadSaveBtn').addEventListener('click', saveTodoLeadLink);
+  document.getElementById('todoLeadCreateBtn').addEventListener('click', createLeadFromTodo);
   document.getElementById('syncDbBtn').addEventListener('click', async () => {
     if (!isWaxx()) return;
     dbConfig = {
@@ -2965,6 +3044,13 @@ function setupEvents() {
     exportCalendarEvent(todo.title, todo.dueDate, todo.dueTime || '09:00', 'Tâche CRM');
   });
 
+  document.addEventListener('click', e => {
+    const linkBtn = e.target.closest('[data-todo-link]');
+    if (!linkBtn) return;
+    e.stopPropagation();
+    openTodoLeadModal(linkBtn.dataset.todoLink);
+  });
+
   document.addEventListener('change', e => {
     const checkbox = e.target.closest('[data-todo-toggle]');
     if (!checkbox) return;
@@ -2984,11 +3070,22 @@ function setupEvents() {
     e.stopPropagation();
     deleteTodo(deleteBtn.dataset.todoDelete);
   });
+
+  document.addEventListener('click', e => {
+    const todoCard = e.target.closest('.todo-item[data-id]');
+    if (!todoCard) return;
+    if (e.target.closest('button, a, input, label')) return;
+    toggleTodo(todoCard.dataset.id);
+  });
   
   // Reminder item click
   document.addEventListener('click', e => {
     const item = e.target.closest('.reminder-item');
-    if (item && !e.target.closest('.reminder-call-btn') && !e.target.closest('[data-agenda-lead]')) {
+    if (item && !e.target.closest('.reminder-call-btn') && !e.target.closest('[data-agenda-lead]') && !e.target.closest('[data-agenda-todo]')) {
+      if (item.dataset.dashboardTodo) {
+        toggleTodo(item.dataset.dashboardTodo);
+        return;
+      }
       openProspectDetail(item.dataset.id);
     }
   });
@@ -3253,7 +3350,7 @@ function renderDashboardReminders() {
         </div>
         ${item.type === 'prospect'
           ? `<button class="agenda-btn" data-agenda-lead="${esc(item.id)}">Agenda</button><button class="reminder-call-btn" data-id="${esc(item.id)}">📞</button>`
-          : `<button class="agenda-btn" data-agenda-todo="${esc(item.id)}">Agenda</button><button class="btn-ghost" type="button" data-view="todos">Voir</button>`
+          : `<button class="agenda-btn" data-agenda-todo="${esc(item.id)}">Agenda</button>`
         }
       </div>
     `).join('')}

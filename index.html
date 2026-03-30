@@ -776,6 +776,40 @@
   </div>
 </div>
 
+<!-- ═══ MODAL TODO -> LEAD ═══ -->
+<div id="todoLeadModal" class="modal-backdrop" style="display:none">
+  <div class="modal-box modal-sm">
+    <div class="modal-head">
+      <button class="back-btn-modal" data-close="todoLeadModal"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Retour</button>
+      <h3>Qualifier depuis le suivi</h3>
+      <button class="icon-btn" data-close="todoLeadModal"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal-scroll">
+      <div class="detail-notes" id="todoLeadTaskSummary" style="margin-bottom:16px"></div>
+      <div class="form-group">
+        <label>Lead existant</label>
+        <select id="todoLeadSelect"></select>
+      </div>
+      <div class="form-group">
+        <label>Étape à appliquer</label>
+        <select id="todoLeadStatusSelect">
+          <option value="">Ne pas changer</option>
+          <option value="froid">Nouveau lead</option>
+          <option value="chaud">Qualifié</option>
+          <option value="signe">À convertir</option>
+        </select>
+      </div>
+      <div class="detail-notes">
+        Si aucun lead n’est lié, tu peux en créer un depuis cette note si elle contient au minimum un nom et un numéro.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" id="todoLeadCreateBtn" type="button">Créer un lead</button>
+      <button class="btn-primary" id="todoLeadSaveBtn" type="button">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ COMMAND PALETTE ═══ -->
 <div id="commandPalette" class="cmd-palette-backdrop" style="display:none">
   <div class="cmd-palette-box">
