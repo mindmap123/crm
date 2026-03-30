@@ -2,8 +2,8 @@
 
 // ─── ADMINS ───────────────────────────────────────────────────────────────────
 const ADMINS = [
-  { id: 'a1', username: 'enzo',  password: 'atelier2024', name: 'Enzo' },
-  { id: 'a2', username: 'antho', password: 'atelier2024', name: 'Antho' },
+  { id: 'a1', username: 'enzo',  password: 'Pablo1808@', name: 'Enzo' },
+  { id: 'a2', username: 'antho', password: 'Alexia2008@', name: 'Antho' },
   { id: 'a3', username: 'waxx',  password: 'atelier2024', name: 'Waxx' },
 ];
 
