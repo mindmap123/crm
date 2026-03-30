@@ -898,7 +898,7 @@ function todoItemHtml(todo) {
   return `
     <div class="todo-item ${todo.status}" data-id="${esc(todo.id)}">
       <label class="todo-checkbox">
-        <input type="checkbox" ${todo.status === 'done' ? 'checked' : ''} onchange="toggleTodo('${esc(todo.id)}')">
+        <input type="checkbox" ${todo.status === 'done' ? 'checked' : ''} data-todo-toggle="${esc(todo.id)}">
         <span class="todo-check"></span>
       </label>
       <div class="todo-content">
@@ -912,13 +912,13 @@ function todoItemHtml(todo) {
       </div>
       <div class="todo-actions">
         ${todo.dueDate ? `<button class="agenda-btn" data-agenda-todo="${esc(todo.id)}" title="Agenda Apple">Agenda</button>` : ''}
-        <button class="todo-action-btn" onclick="event.stopPropagation();snoozeTodo('${esc(todo.id)}',1)" title="Demain">
+        <button class="todo-action-btn" type="button" data-todo-snooze="${esc(todo.id)}" data-snooze-days="1" title="Demain">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm1-11h-2v6l5.25 3.15.75-1.23-4-2.42V9z"/></svg>
         </button>
-        <button class="todo-action-btn" onclick="event.stopPropagation();snoozeTodo('${esc(todo.id)}',7)" title="Semaine prochaine">
+        <button class="todo-action-btn" type="button" data-todo-snooze="${esc(todo.id)}" data-snooze-days="7" title="Semaine prochaine">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
         </button>
-        <button class="todo-action-btn todo-delete" onclick="event.stopPropagation();deleteTodo('${esc(todo.id)}')" title="Supprimer">
+        <button class="todo-action-btn todo-delete" type="button" data-todo-delete="${esc(todo.id)}" title="Supprimer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
       </div>
@@ -2963,6 +2963,26 @@ function setupEvents() {
     const todo = todos.find(item => item.id === btn.dataset.agendaTodo);
     if (!todo?.dueDate) return;
     exportCalendarEvent(todo.title, todo.dueDate, todo.dueTime || '09:00', 'Tâche CRM');
+  });
+
+  document.addEventListener('change', e => {
+    const checkbox = e.target.closest('[data-todo-toggle]');
+    if (!checkbox) return;
+    toggleTodo(checkbox.dataset.todoToggle);
+  });
+
+  document.addEventListener('click', e => {
+    const snoozeBtn = e.target.closest('[data-todo-snooze][data-snooze-days]');
+    if (!snoozeBtn) return;
+    e.stopPropagation();
+    snoozeTodo(snoozeBtn.dataset.todoSnooze, Number(snoozeBtn.dataset.snoozeDays || 0));
+  });
+
+  document.addEventListener('click', e => {
+    const deleteBtn = e.target.closest('[data-todo-delete]');
+    if (!deleteBtn) return;
+    e.stopPropagation();
+    deleteTodo(deleteBtn.dataset.todoDelete);
   });
   
   // Reminder item click
