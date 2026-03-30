@@ -2239,9 +2239,10 @@ function studentCardHtml(s) {
       <div class="card-top">
         ${avatarHtml(s,46)}
         <div class="card-info">
-          <div class="card-name">${esc(s.name)}</div>
-          <div class="card-email">${esc(s.email||'—')}</div>
-          <div class="card-phone">${esc(s.phone||'')}</div>
+      <div class="card-name">${esc(s.name)}</div>
+      <div class="card-email">${esc(s.email||'—')}</div>
+      <div class="card-phone">${esc(s.phone||'')}</div>
+      ${s.socialHandle ? `<div class="card-phone">${esc(s.socialHandle)}</div>` : ''}
         </div>
         <div class="color-dot" style="background:${ci.hex}" title="${ci.label}"></div>
       </div>
@@ -2610,6 +2611,7 @@ function openDetail(id) {
     <div class="detail-grid">
       <div class="detail-field"><div class="detail-field-label">Téléphone</div><div class="detail-field-value">${esc(s.phone||'—')}</div></div>
       <div class="detail-field"><div class="detail-field-label">Email</div><div class="detail-field-value" style="font-size:12px;word-break:break-all">${esc(s.email||'—')}</div></div>
+      ${s.socialHandle ? `<div class="detail-field"><div class="detail-field-label">Pseudo TikTok / Insta</div><div class="detail-field-value">${esc(s.socialHandle)}</div></div>` : ''}
       ${s.trade ? `<div class="detail-field"><div class="detail-field-label">Métier</div><div class="detail-field-value">${trade.icon} ${esc(trade.label)}</div></div>` : ''}
       <div class="detail-field"><div class="detail-field-label">Montant payé</div><div class="detail-field-value">${esc(formatCurrency(s.amount))}</div></div>
       <div class="detail-field"><div class="detail-field-label">Moyen de paiement</div><div class="detail-field-value">${esc(s.method||'—')}</div></div>
@@ -2646,6 +2648,7 @@ function openEditForm(id) {
   document.getElementById('fName').value    = s.name      ||'';
   document.getElementById('fEmail').value   = s.email     ||'';
   document.getElementById('fPhone').value   = s.phone     ||'';
+  document.getElementById('fSocial').value  = s.socialHandle || '';
   document.getElementById('fTrade').value   = s.trade     ||'';
   document.getElementById('fDate').value    = s.skoolDate ||'';
   document.getElementById('fAmount').value  = s.amount    ||'';
@@ -2663,7 +2666,7 @@ function openEditForm(id) {
 }
 
 function resetForm() {
-  ['fName','fEmail','fPhone','fNotes'].forEach(id=>document.getElementById(id).value='');
+  ['fName','fEmail','fPhone','fSocial','fNotes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fTrade').value='';
   document.getElementById('fDate').value=''; document.getElementById('fAmount').value=''; document.getElementById('fMethod').value='';
   document.getElementById('fWebsite').checked=false; document.getElementById('fGmb').checked=false;
@@ -2687,6 +2690,7 @@ function saveStudent() {
     name,
     email:     document.getElementById('fEmail').value.trim(),
     phone:     document.getElementById('fPhone').value.trim(),
+    socialHandle: document.getElementById('fSocial').value.trim(),
     trade:     document.getElementById('fTrade').value,
     skoolDate: document.getElementById('fDate').value,
     amount:    document.getElementById('fAmount').value,
@@ -3313,6 +3317,7 @@ function prospectCardHtml(p) {
         <div class="prospect-info">
           <div class="prospect-name">${esc(p.name)}</div>
           <div class="prospect-phone">${esc(p.phone || '—')}</div>
+          ${p.socialHandle ? `<div class="prospect-phone">${esc(p.socialHandle)}</div>` : ''}
         </div>
       </div>
       ${p.email ? `<div class="prospect-email">${esc(p.email)}</div>` : ''}
@@ -3367,6 +3372,7 @@ function openAddProspect(status = 'froid') {
   document.getElementById('pfName').value = '';
   document.getElementById('pfPhone').value = '';
   document.getElementById('pfEmail').value = '';
+  document.getElementById('pfSocial').value = '';
   document.getElementById('pfTrade').value = '';
   document.getElementById('pfSource').value = '';
   document.getElementById('pfOwner').value = state.currentUser?.id || '';
@@ -3388,6 +3394,7 @@ function openEditProspect(id) {
   document.getElementById('pfName').value = p.name || '';
   document.getElementById('pfPhone').value = p.phone || '';
   document.getElementById('pfEmail').value = p.email || '';
+  document.getElementById('pfSocial').value = p.socialHandle || '';
   document.getElementById('pfTrade').value = p.trade || '';
   document.getElementById('pfSource').value = p.source || '';
   document.getElementById('pfOwner').value = p.ownerId || '';
@@ -3418,6 +3425,7 @@ function saveProspect() {
     name,
     phone,
     email: document.getElementById('pfEmail').value.trim(),
+    socialHandle: document.getElementById('pfSocial').value.trim(),
     trade: document.getElementById('pfTrade').value,
     source: document.getElementById('pfSource').value,
     ownerId: document.getElementById('pfOwner').value,
@@ -3473,6 +3481,7 @@ function openProspectDetail(id) {
     <div class="detail-grid">
       <div class="detail-field"><div class="detail-field-label">Téléphone</div><div class="detail-field-value">${esc(p.phone)}</div></div>
       <div class="detail-field"><div class="detail-field-label">Email</div><div class="detail-field-value" style="font-size:12px;word-break:break-all">${esc(p.email || '—')}</div></div>
+      ${p.socialHandle ? `<div class="detail-field"><div class="detail-field-label">Pseudo TikTok / Insta</div><div class="detail-field-value">${esc(p.socialHandle)}</div></div>` : ''}
       ${p.trade ? `<div class="detail-field"><div class="detail-field-label">Métier</div><div class="detail-field-value">${trade.icon} ${esc(trade.label)}</div></div>` : ''}
       ${p.source ? `<div class="detail-field"><div class="detail-field-label">Source</div><div class="detail-field-value">${esc(p.source)}</div></div>` : ''}
       ${p.ownerName ? `<div class="detail-field"><div class="detail-field-label">Responsable</div><div class="detail-field-value">${esc(p.ownerName)}</div></div>` : ''}
@@ -3531,6 +3540,7 @@ function convertProspectToStudent(id, options = {}) {
     name: p.name,
     email: p.email || '',
     phone: p.phone || '',
+    socialHandle: p.socialHandle || '',
     trade: p.trade || '',
     skoolDate: new Date().toISOString().split('T')[0],
     amount: '',
