@@ -1590,6 +1590,17 @@ async function ensureAiMicrophoneAccess() {
   return true;
 }
 
+function stopAiVoiceCapture(statusMessage = 'Dictée arrêtée. Tu peux lancer une action IA sur le texte capturé.') {
+  aiSpeechShouldContinue = false;
+  if (aiSpeechRecognition && aiSpeechListening) {
+    try {
+      aiSpeechRecognition.stop();
+    } catch {}
+  }
+  setAiVoiceStatus(statusMessage, true);
+  renderAiHub();
+}
+
 async function toggleAiVoiceCapture() {
   const support = getAiVoiceSupportState();
   if (!support.supported || !setupAiVoiceRecognition()) {
@@ -1600,9 +1611,7 @@ async function toggleAiVoiceCapture() {
   }
 
   if (aiSpeechListening) {
-    aiSpeechShouldContinue = false;
-    aiSpeechRecognition.stop();
-    setAiVoiceStatus('Dictée arrêtée. Tu peux lancer une action IA sur le texte capturé.', true);
+    stopAiVoiceCapture();
     return;
   }
 
@@ -1631,6 +1640,11 @@ async function toggleAiVoiceCapture() {
 }
 
 async function runAiWorkspaceAction(kind) {
+  if (aiSpeechListening || aiSpeechShouldContinue) {
+    stopAiVoiceCapture('Dictée arrêtée pour lancer l’action IA.');
+    await new Promise(resolve => window.setTimeout(resolve, 220));
+  }
+
   const payload = buildAiWorkspacePayload();
   if (!payload.note && kind !== 'business') {
     state.aiWorkspaceResult = { loading: false, text: '', error: 'Colle d’abord une note ou un contexte dans l’atelier IA.' };
@@ -1646,6 +1660,7 @@ async function runAiWorkspaceAction(kind) {
     state.aiWorkspaceResult = { loading: false, text: text || 'Aucune réponse.', error: '' };
   } catch (error) {
     state.aiWorkspaceResult = { loading: false, text: '', error: error.message || 'Erreur IA' };
+    showToast(error.message || 'Erreur IA', 'warning');
   }
   renderAiHub();
 }
