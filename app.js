@@ -61,6 +61,17 @@ let aiSpeechShouldContinue = false;
 let aiSpeechCommittedText = '';
 let remoteSaveTimer = null;
 
+function mergeAiConfig(saved) {
+  return {
+    ...JSON.parse(JSON.stringify(AI_DEFAULTS)),
+    ...(saved || {}),
+    providers: {
+      ...JSON.parse(JSON.stringify(AI_DEFAULTS.providers)),
+      ...((saved && saved.providers) || {}),
+    },
+  };
+}
+
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
 function loadData() {
   try { state.students = JSON.parse(localStorage.getItem('crm_students') || '[]'); } catch { state.students = []; }
@@ -96,14 +107,7 @@ function loadAiConfig() {
   try {
     const saved = JSON.parse(localStorage.getItem('crm_ai_config') || 'null');
     if (!saved) return;
-    aiConfig = {
-      ...JSON.parse(JSON.stringify(AI_DEFAULTS)),
-      ...saved,
-      providers: {
-        ...JSON.parse(JSON.stringify(AI_DEFAULTS.providers)),
-        ...(saved.providers || {}),
-      },
-    };
+    aiConfig = mergeAiConfig(saved);
   } catch {
     aiConfig = JSON.parse(JSON.stringify(AI_DEFAULTS));
   }
@@ -135,6 +139,7 @@ function clearAllData() {
   localStorage.removeItem('crm_prospects');
   localStorage.removeItem('crm_todos');
   localStorage.removeItem('crm_ideas');
+  localStorage.removeItem('crm_ai_config');
 }
 
 function seedDemoData() {
@@ -1196,6 +1201,7 @@ function getRemoteStatePayload() {
     todos,
     ideas,
     journal: state.journal,
+    ai_settings: aiConfig,
     updated_at: new Date().toISOString(),
   };
 }
@@ -1206,6 +1212,10 @@ function applyRemoteState(payload) {
   todos = Array.isArray(payload.todos) ? payload.todos : [];
   ideas = Array.isArray(payload.ideas) ? payload.ideas : [];
   state.journal = Array.isArray(payload.journal) ? payload.journal : [];
+  if (payload.ai_settings && typeof payload.ai_settings === 'object') {
+    aiConfig = mergeAiConfig(payload.ai_settings);
+    localStorage.setItem('crm_ai_config', JSON.stringify(aiConfig));
+  }
   localStorage.setItem('crm_students', JSON.stringify(state.students));
   localStorage.setItem('crm_journal', JSON.stringify(state.journal));
   localStorage.setItem('crm_prospects', JSON.stringify(prospects));
@@ -1306,7 +1316,7 @@ function openAiModal() {
   openModal('aiModal');
 }
 
-function saveAiModalConfig() {
+async function saveAiModalConfig() {
   if (!isWaxx()) return;
   const provider = aiModalProvider || aiConfig.provider;
   aiConfig.provider = provider;
@@ -1323,6 +1333,7 @@ function saveAiModalConfig() {
     workspace: document.getElementById('dbWorkspaceInput').value.trim() || DB_DEFAULTS.workspace,
   };
   saveDbConfig();
+  if (isDbConfigured()) await saveRemoteState();
   closeModal('aiModal');
   showToast('Configuration IA et BDD enregistrée', 'success');
 }

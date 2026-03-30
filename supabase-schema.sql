@@ -7,8 +7,12 @@ create table if not exists public.app_state (
   todos jsonb not null default '[]'::jsonb,
   ideas jsonb not null default '[]'::jsonb,
   journal jsonb not null default '[]'::jsonb,
+  ai_settings jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
+
+alter table public.app_state
+add column if not exists ai_settings jsonb not null default '{}'::jsonb;
 
 alter table public.app_state enable row level security;
 
