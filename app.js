@@ -6,6 +6,11 @@ const ADMINS = [
   { id: 'a2', username: 'antho', password: 'Alexia2008@', name: 'Antho' },
   { id: 'a3', username: 'waxx',  password: 'atelier2024', name: 'Waxx' },
 ];
+const GOOGLE_EVENT_COLORS = {
+  a1: '9',
+  a2: '6',
+  a3: '11',
+};
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let state = {
@@ -74,6 +79,15 @@ function getDefaultGoogleState() {
     connectedEmail: '',
     calendarId: 'primary',
     connectedAt: '',
+  };
+}
+
+function getCurrentAdminCalendarMeta() {
+  const admin = state.currentUser || ADMINS[0];
+  return {
+    adminId: admin.id,
+    adminName: admin.name,
+    colorId: GOOGLE_EVENT_COLORS[admin.id] || '9',
   };
 }
 
@@ -922,17 +936,28 @@ async function syncProspectToGoogle(prospectId) {
 
   const start = combineDateTime(prospect.reminderDate, prospect.reminderTime || '09:00');
   const end = new Date(start.getTime() + 30 * 60000);
+  const calendarMeta = getCurrentAdminCalendarMeta();
   const event = await createGoogleCalendarEvent({
-    summary: `Relance ${prospect.name}`,
-    description: [prospect.reminderNote, prospect.notes, prospect.phone ? `Téléphone : ${prospect.phone}` : '', prospect.socialHandle ? `Pseudo : ${prospect.socialHandle}` : ''].filter(Boolean).join('\n'),
+    summary: `${calendarMeta.adminName} · Relance ${prospect.name}`,
+    description: [
+      `Créé depuis L'Atelier CRM par ${calendarMeta.adminName}`,
+      prospect.reminderNote,
+      prospect.notes,
+      prospect.phone ? `Téléphone : ${prospect.phone}` : '',
+      prospect.socialHandle ? `Pseudo : ${prospect.socialHandle}` : '',
+    ].filter(Boolean).join('\n'),
     attendeeEmail: prospect.email || '',
     attendeeName: prospect.name,
     startDateTime: start.toISOString(),
     endDateTime: end.toISOString(),
     timeZone: 'Europe/Paris',
+    colorId: calendarMeta.colorId,
   });
   prospect.googleEvent = {
     ...event,
+    createdById: calendarMeta.adminId,
+    createdByName: calendarMeta.adminName,
+    colorId: calendarMeta.colorId,
     syncedAt: new Date().toISOString(),
   };
   prospect.updatedAt = Date.now();
@@ -965,6 +990,7 @@ async function syncTodoToGoogle(todoId) {
   const attendeeEmail = linkedProspect?.email || linkedStudent?.email || '';
   const attendeeName = linkedProspect?.name || linkedStudent?.name || '';
   const description = [
+    `Créé depuis L'Atelier CRM par ${getCurrentAdminCalendarMeta().adminName}`,
     todo.rawInput || todo.title,
     linkedProspect?.phone ? `Téléphone : ${linkedProspect.phone}` : '',
     linkedProspect?.socialHandle ? `Pseudo : ${linkedProspect.socialHandle}` : '',
@@ -972,17 +998,22 @@ async function syncTodoToGoogle(todoId) {
   ].filter(Boolean).join('\n');
   const start = combineDateTime(todo.dueDate, todo.dueTime || '09:00');
   const end = new Date(start.getTime() + 30 * 60000);
+  const calendarMeta = getCurrentAdminCalendarMeta();
   const event = await createGoogleCalendarEvent({
-    summary: todo.title,
+    summary: `${calendarMeta.adminName} · ${todo.title}`,
     description,
     attendeeEmail,
     attendeeName,
     startDateTime: start.toISOString(),
     endDateTime: end.toISOString(),
     timeZone: 'Europe/Paris',
+    colorId: calendarMeta.colorId,
   });
   todo.googleEvent = {
     ...event,
+    createdById: calendarMeta.adminId,
+    createdByName: calendarMeta.adminName,
+    colorId: calendarMeta.colorId,
     syncedAt: new Date().toISOString(),
   };
   saveTodos();
