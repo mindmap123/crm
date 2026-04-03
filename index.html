@@ -454,6 +454,7 @@
             <button class="schedule-chip active" type="button" data-date-mode="today">Aujourd'hui</button>
             <button class="schedule-chip" type="button" data-date-mode="tomorrow">Demain</button>
             <button class="schedule-chip" type="button" data-date-mode="week">Cette semaine</button>
+            <button class="schedule-chip" type="button" data-date-mode="none">Sans date</button>
             <button class="schedule-chip ghost" type="button" id="todoCustomToggle">Personnaliser</button>
           </div>
           <div class="schedule-chip-row" id="todoQuickTime">
@@ -471,6 +472,13 @@
         <div class="todo-input-box">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="#8E8E93"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           <input type="text" id="todoInput" placeholder="Tâche... (ex: Relancer @Jean demain à 14h)" autocomplete="off">
+        </div>
+        <div class="todo-form-actions">
+          <div class="todo-edit-badge" id="todoEditBadge" style="display:none">Modification en cours</div>
+          <div class="todo-form-buttons">
+            <button class="btn-ghost" type="button" id="cancelTodoEditBtn" style="display:none">Annuler</button>
+            <button class="btn-primary" type="button" id="saveTodoBtn">Ajouter la tâche</button>
+          </div>
         </div>
         <div class="todo-input-hint">💡 Utilisez @ pour mentionner · dates naturelles (demain, lundi prochain...) · <kbd>Cmd+K</kbd> pour actions rapides</div>
         <div id="todoContextBar" class="todo-context-bar" style="display:none"></div>
@@ -505,6 +513,14 @@
           <h3>À venir</h3>
         </div>
         <div class="todo-list" id="upcomingTodos"></div>
+      </div>
+
+      <div class="todo-section">
+        <div class="todo-section-header">
+          <h3>Sans date</h3>
+          <span class="todo-section-count" id="undatedCount">0</span>
+        </div>
+        <div class="todo-list" id="undatedTodos"></div>
       </div>
 
       <!-- Completed -->

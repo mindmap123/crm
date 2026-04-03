@@ -36,6 +36,7 @@ let state = {
     calendarId: 'primary',
     connectedAt: '',
   },
+  editingTodoId: null,
 };
 
 const charts = {};
@@ -562,8 +563,9 @@ function getTodoScheduleSelection() {
     dueDate = formatIsoDate(tomorrow);
   }
   if (dateMode === 'week') dueDate = formatIsoDate(getEndOfWeekDate());
+  if (dateMode === 'none') dueDate = null;
 
-  return { dueDate, dueTime: timeValue || null };
+  return { dueDate, dueTime: dueDate ? (timeValue || null) : null };
 }
 
 function updateTodoSchedulePreview() {
@@ -597,6 +599,74 @@ function clearTodoScheduleSelection() {
   updateTodoSchedulePreview();
 }
 
+function getTodoQuickDateMode(todo) {
+  if (!todo.dueDate) return 'none';
+  const today = formatIsoDate(new Date());
+  const tomorrow = formatIsoDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const week = formatIsoDate(getEndOfWeekDate());
+  if (todo.dueDate === today) return 'today';
+  if (todo.dueDate === tomorrow) return 'tomorrow';
+  if (todo.dueDate === week) return 'week';
+  return 'custom';
+}
+
+function updateTodoComposerUi() {
+  const badge = document.getElementById('todoEditBadge');
+  const saveBtn = document.getElementById('saveTodoBtn');
+  const cancelBtn = document.getElementById('cancelTodoEditBtn');
+  const input = document.getElementById('todoInput');
+  if (!badge || !saveBtn || !cancelBtn || !input) return;
+
+  const isEditing = Boolean(state.editingTodoId);
+  badge.style.display = isEditing ? 'inline-flex' : 'none';
+  cancelBtn.style.display = isEditing ? 'inline-flex' : 'none';
+  saveBtn.textContent = isEditing ? 'Enregistrer' : 'Ajouter la tâche';
+  input.placeholder = isEditing
+    ? 'Modifie la tâche puis enregistre'
+    : 'Tâche... (ex: Relancer @Jean demain à 14h)';
+}
+
+function resetTodoComposer() {
+  state.editingTodoId = null;
+  const input = document.getElementById('todoInput');
+  if (input) input.value = '';
+  if (document.getElementById('todoOwnerSelect') && state.currentUser) {
+    document.getElementById('todoOwnerSelect').value = state.currentUser.id;
+  }
+  clearTodoScheduleSelection();
+  updateTodoComposerUi();
+}
+
+function fillTodoComposer(todo) {
+  const input = document.getElementById('todoInput');
+  if (input) input.value = todo.title || '';
+  const ownerSelect = document.getElementById('todoOwnerSelect');
+  if (ownerSelect) ownerSelect.value = todo.ownerId || state.currentUser?.id || ADMINS[0].id;
+
+  clearTodoScheduleSelection();
+  if (document.getElementById('todoDateInput')) document.getElementById('todoDateInput').value = todo.dueDate || '';
+  if (document.getElementById('todoTimeInput')) document.getElementById('todoTimeInput').value = todo.dueTime || '';
+  const customRow = document.getElementById('todoCustomSchedule');
+  document.querySelectorAll('#todoQuickDate .schedule-chip[data-date-mode]').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('#todoQuickTime .schedule-chip[data-time-value]').forEach(btn => btn.classList.remove('active'));
+  const dateMode = getTodoQuickDateMode(todo);
+  if (dateMode === 'custom') {
+    if (customRow) customRow.style.display = 'flex';
+  } else {
+    document.querySelector(`#todoQuickDate [data-date-mode="${dateMode}"]`)?.classList.add('active');
+  }
+  const matchingTime = document.querySelector(`#todoQuickTime .schedule-chip[data-time-value="${todo.dueTime || ''}"]`);
+  if (matchingTime) {
+    matchingTime.classList.add('active');
+  } else if (!todo.dueTime) {
+    document.querySelector('#todoQuickTime [data-time-value=""]')?.classList.add('active');
+  } else {
+    if (customRow) customRow.style.display = 'flex';
+  }
+  updateTodoSchedulePreview();
+  updateTodoComposerUi();
+}
+
 function createTodo(input, contextType = null, contextId = null) {
   const parsed = parseNaturalInput(input);
   const ownerId = document.getElementById('todoOwnerSelect')?.value || state.currentUser.id;
@@ -627,6 +697,60 @@ function createTodo(input, contextType = null, contextId = null) {
   return todo;
 }
 
+function saveTodoFromComposer() {
+  const input = document.getElementById('todoInput');
+  const title = input?.value.trim() || '';
+  if (!title) {
+    input?.focus();
+    return;
+  }
+
+  const parsed = parseNaturalInput(title);
+  const ownerId = document.getElementById('todoOwnerSelect')?.value || state.currentUser.id;
+  const owner = ADMINS.find(a => a.id === ownerId) || state.currentUser;
+  const schedule = getTodoScheduleSelection();
+
+  if (state.editingTodoId) {
+    const todo = todos.find(item => item.id === state.editingTodoId);
+    if (!todo) {
+      resetTodoComposer();
+      return;
+    }
+    const previousTitle = todo.title;
+    const previousDate = todo.dueDate;
+    const previousTime = todo.dueTime;
+    todo.title = title;
+    todo.rawInput = title;
+    todo.dueDate = schedule.dueDate || parsed.dueDate;
+    todo.dueTime = schedule.dueTime || parsed.dueTime;
+    todo.mentions = parsed.mentions;
+    todo.ownerId = owner.id;
+    todo.ownerName = owner.name;
+    if (previousTitle !== todo.title || previousDate !== todo.dueDate || previousTime !== todo.dueTime) {
+      todo.googleEvent = null;
+    }
+    saveTodos();
+    logActivity('edit', 'todo', todo.title, 'Tâche modifiée');
+    renderTodos();
+    renderDashboard();
+    updateTodoBadges();
+    showToast('Tâche mise à jour', 'success');
+    resetTodoComposer();
+    return;
+  }
+
+  const contextType = state.todoDraftContext?.type || null;
+  const contextId = state.todoDraftContext?.id || null;
+  createTodo(title, contextType, contextId);
+  input.value = '';
+  state.todoDraftContext = null;
+  renderTodos();
+  renderDashboard();
+  updateTodoBadges();
+  showTodoPreview(title);
+  updateTodoComposerUi();
+}
+
 function createAiTodo({ title, dueDate = null, dueTime = null, note = '', contextType = null, contextId = null }) {
   const owner = state.currentUser || ADMINS[0];
   const todo = {
@@ -654,6 +778,16 @@ function createAiTodo({ title, dueDate = null, dueTime = null, note = '', contex
   renderDashboard();
   updateTodoBadges();
   return todo;
+}
+
+function openEditTodo(id) {
+  const todo = todos.find(item => item.id === id);
+  if (!todo) return;
+  state.editingTodoId = id;
+  state.todoDraftContext = todo.contextType && todo.contextId ? { type: todo.contextType, id: todo.contextId } : null;
+  showView('todos');
+  fillTodoComposer(todo);
+  document.getElementById('todoInput')?.focus();
 }
 
 function openTodoLeadModal(todoId) {
@@ -760,6 +894,7 @@ function snoozeTodo(id, days) {
 function deleteTodo(id) {
   const todo = todos.find(t => t.id === id);
   todos = todos.filter(t => t.id !== id);
+  if (state.editingTodoId === id) resetTodoComposer();
   saveTodos();
   if (todo) logActivity('delete', 'todo', todo.title, 'Tâche supprimée');
   renderTodos();
@@ -792,7 +927,11 @@ function getOverdueTodos() {
 
 function getUpcomingTodos() {
   const today = new Date().toISOString().split('T')[0];
-  return getVisibleTodos().filter(t => t.status === 'pending' && (!t.dueDate || t.dueDate > today));
+  return getVisibleTodos().filter(t => t.status === 'pending' && t.dueDate && t.dueDate > today);
+}
+
+function getUndatedTodos() {
+  return getVisibleTodos().filter(t => t.status === 'pending' && !t.dueDate);
 }
 
 function getCompletedTodos() {
@@ -809,24 +948,29 @@ function renderTodos() {
     const ownerSelect = document.getElementById('todoOwnerSelect');
     if (ownerSelect) ownerSelect.value = state.currentUser?.id || ADMINS[0].id;
   }
+  updateTodoComposerUi();
   const todayList = getTodayTodos();
   const overdueList = getOverdueTodos();
   const upcomingList = getUpcomingTodos();
+  const undatedList = getUndatedTodos();
   const completedList = getCompletedTodos();
   
   const todayContainer = document.getElementById('todayTodos');
   const overdueContainer = document.getElementById('overdueTodos');
   const upcomingContainer = document.getElementById('upcomingTodos');
+  const undatedContainer = document.getElementById('undatedTodos');
   const completedContainer = document.getElementById('completedTodos');
   
   document.getElementById('todayCount').textContent = todayList.length;
   document.getElementById('overdueCount').textContent = overdueList.length;
   document.getElementById('completedCount').textContent = completedList.length;
+  document.getElementById('undatedCount').textContent = undatedList.length;
   document.getElementById('clearCompletedBtn').style.display = completedList.length ? 'inline-flex' : 'none';
   
   todayContainer.innerHTML = todayList.length ? todayList.map(todoItemHtml).join('') : '<div class="todo-empty">Aucune tâche pour aujourd\'hui 🎉</div>';
   overdueContainer.innerHTML = overdueList.length ? overdueList.map(todoItemHtml).join('') : '<div class="todo-empty">Aucune tâche en retard</div>';
   upcomingContainer.innerHTML = upcomingList.length ? upcomingList.map(todoItemHtml).join('') : '<div class="todo-empty">Aucune tâche à venir</div>';
+  undatedContainer.innerHTML = undatedList.length ? undatedList.map(todoItemHtml).join('') : '<div class="todo-empty">Aucune tâche sans date</div>';
   completedContainer.innerHTML = completedList.length ? completedList.map(todoItemHtml).join('') : '<div class="todo-empty">Aucune tâche terminée</div>';
   
   // Update overdue accordion visibility
@@ -1155,6 +1299,7 @@ function todoItemHtml(todo) {
   const contextName = getContextDisplayName(todo.contextType, todo.contextId);
   const ownerName = getTodoOwnerName(todo);
   const leadActionLabel = todo.contextType === 'prospect' ? 'Qualifier' : 'Lier lead';
+  const hasLinkedRecord = Boolean(todo.contextType && todo.contextId && contextName);
   
   return `
     <div class="todo-item ${todo.status}" data-id="${esc(todo.id)}">
@@ -1167,12 +1312,19 @@ function todoItemHtml(todo) {
         <div class="todo-meta">
           ${todo.dueDate ? `<span class="todo-date">📅 ${formatDate(todo.dueDate)}${todo.dueTime ? ' · ' + todo.dueTime : ''}</span>` : ''}
           ${contextName ? `<span class="todo-context">${contextLabel} · ${esc(contextName)}</span>` : ''}
+          ${hasLinkedRecord ? `<span class="todo-linked-tag">Liée</span>` : ''}
           ${ownerName ? `<span class="todo-assignee">👤 ${esc(ownerName)}</span>` : ''}
           ${todo.mentions.length ? `<span class="todo-mentions">${todo.mentions.map(m => '@' + esc(m)).join(', ')}</span>` : ''}
         </div>
       </div>
       <div class="todo-actions">
         ${todo.dueDate ? buildGoogleButtons('todo', todo) : ''}
+        ${hasLinkedRecord ? `<button class="todo-action-btn todo-edit" type="button" data-todo-open-context="${esc(todo.id)}" title="Ouvrir la fiche liée">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 3v2h3.59L7 15.59 8.41 17 19 6.41V10h2V3z"/><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7z"/></svg>
+        </button>` : ''}
+        <button class="todo-action-btn todo-edit" type="button" data-todo-edit="${esc(todo.id)}" title="Modifier">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75l11-11-3.75-3.75-11 11zM20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0L15.13 5.11l3.75 3.75 1.83-1.82z"/></svg>
+        </button>
         <button class="todo-action-btn todo-link-btn" type="button" data-todo-link="${esc(todo.id)}" title="${esc(leadActionLabel)}">
           ${esc(leadActionLabel)}
         </button>
@@ -3030,6 +3182,8 @@ function setupEvents() {
   document.getElementById('aiVoiceBtn').addEventListener('click', toggleAiVoiceCapture);
   document.getElementById('connectGoogleBtn').addEventListener('click', connectGoogleCalendar);
   document.getElementById('saveAiConfigBtn').addEventListener('click', saveAiModalConfig);
+  document.getElementById('saveTodoBtn').addEventListener('click', saveTodoFromComposer);
+  document.getElementById('cancelTodoEditBtn').addEventListener('click', resetTodoComposer);
   document.getElementById('todoLeadSaveBtn').addEventListener('click', saveTodoLeadLink);
   document.getElementById('todoLeadCreateBtn').addEventListener('click', createLeadFromTodo);
   document.getElementById('syncDbBtn').addEventListener('click', async () => {
@@ -3247,6 +3401,28 @@ function setupEvents() {
   });
 
   document.addEventListener('click', e => {
+    const openContextBtn = e.target.closest('[data-todo-open-context]');
+    if (!openContextBtn) return;
+    e.stopPropagation();
+    const todo = todos.find(item => item.id === openContextBtn.dataset.todoOpenContext);
+    if (!todo) return;
+    if (todo.contextType === 'prospect' && todo.contextId) {
+      openProspectDetail(todo.contextId);
+      return;
+    }
+    if (todo.contextType === 'student' && todo.contextId) {
+      openDetail(todo.contextId);
+    }
+  });
+
+  document.addEventListener('click', e => {
+    const editBtn = e.target.closest('[data-todo-edit]');
+    if (!editBtn) return;
+    e.stopPropagation();
+    openEditTodo(editBtn.dataset.todoEdit);
+  });
+
+  document.addEventListener('click', e => {
     const linkBtn = e.target.closest('[data-todo-link]');
     if (!linkBtn) return;
     e.stopPropagation();
@@ -3394,17 +3570,7 @@ function setupEvents() {
   document.getElementById('todoInput').addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const input = e.target.value.trim();
-      if (input) {
-        const contextType = state.todoDraftContext?.type || null;
-        const contextId = state.todoDraftContext?.id || null;
-        createTodo(input, contextType, contextId);
-        e.target.value = '';
-        state.todoDraftContext = null;
-        renderTodos();
-        updateTodoBadges();
-        showTodoPreview(input);
-      }
+      saveTodoFromComposer();
     }
   });
 
