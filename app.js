@@ -73,6 +73,8 @@ let aiSpeechShouldContinue = false;
 let aiSpeechCommittedText = '';
 let remoteSaveTimer = null;
 let todoLeadModalTodoId = null;
+let todoLinkEntityType = 'prospect';
+let todoLinkSelection = null;
 
 function getDefaultGoogleState() {
   return {
@@ -794,52 +796,98 @@ function openTodoLeadModal(todoId) {
   const todo = todos.find(item => item.id === todoId);
   if (!todo) return;
   todoLeadModalTodoId = todoId;
-  const select = document.getElementById('todoLeadSelect');
   const statusSelect = document.getElementById('todoLeadStatusSelect');
   const summary = document.getElementById('todoLeadTaskSummary');
-  if (!select || !statusSelect || !summary) return;
+  const searchInput = document.getElementById('todoEntitySearchInput');
+  if (!statusSelect || !summary || !searchInput) return;
 
   summary.textContent = todo.title;
-  select.innerHTML = `<option value="">— Choisir un lead —</option>${
-    prospects.map(prospect => `<option value="${esc(prospect.id)}">${esc(prospect.name)} · ${esc(prospect.phone || 'sans numéro')}</option>`).join('')
-  }`;
-  select.value = todo.contextType === 'prospect' ? (todo.contextId || '') : '';
+  todoLinkEntityType = todo.contextType === 'student' ? 'student' : 'prospect';
+  todoLinkSelection = todo.contextType && todo.contextId ? { type: todo.contextType, id: todo.contextId } : null;
+  searchInput.value = getContextDisplayName(todo.contextType, todo.contextId) || '';
   statusSelect.value = todo.contextType === 'prospect'
     ? (prospects.find(item => item.id === todo.contextId)?.status || '')
-    : 'chaud';
+    : '';
+  renderTodoEntityTypeTabs();
+  renderTodoEntityResults(searchInput.value);
   openModal('todoLeadModal');
+}
+
+function renderTodoEntityTypeTabs() {
+  document.querySelectorAll('#todoEntityTypeTabs .segmented-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.entityType === todoLinkEntityType);
+  });
+  const statusGroup = document.getElementById('todoLeadStatusGroup');
+  if (statusGroup) statusGroup.style.display = todoLinkEntityType === 'prospect' ? 'block' : 'none';
+}
+
+function getTodoEntityCandidates(entityType, query) {
+  const search = (query || '').trim().toLowerCase();
+  const source = entityType === 'student' ? state.students : prospects;
+  const normalized = source.map(item => ({
+    id: item.id,
+    type: entityType,
+    name: item.name || '',
+    phone: item.phone || '',
+    email: item.email || '',
+    socialHandle: item.socialHandle || '',
+    subtitle: entityType === 'student'
+      ? [item.phone, item.email, item.socialHandle].filter(Boolean).join(' · ')
+      : [item.phone, item.email, item.socialHandle, item.source].filter(Boolean).join(' · '),
+    status: entityType === 'prospect' ? item.status || '' : '',
+  }));
+  if (!search) return normalized.slice(0, 8);
+  return normalized
+    .filter(item => [item.name, item.phone, item.email, item.socialHandle].some(value => value.toLowerCase().includes(search)))
+    .slice(0, 8);
+}
+
+function renderTodoEntityResults(query = '') {
+  const container = document.getElementById('todoEntityResults');
+  if (!container) return;
+  const items = getTodoEntityCandidates(todoLinkEntityType, query);
+  if (!items.length) {
+    container.innerHTML = `<div class="todo-entity-empty">Aucune fiche trouvée. Tu peux créer un lead depuis la note si besoin.</div>`;
+    return;
+  }
+  container.innerHTML = items.map(item => `
+    <button class="todo-entity-option ${todoLinkSelection && todoLinkSelection.type === item.type && todoLinkSelection.id === item.id ? 'active' : ''}" type="button" data-todo-entity-pick="${esc(item.id)}" data-todo-entity-type="${esc(item.type)}">
+      <strong>${esc(item.name)} ${item.type === 'student' ? '<span class="todo-linked-tag">Client</span>' : ''}</strong>
+      <span>${esc(item.subtitle || 'Sans détail')}</span>
+    </button>
+  `).join('');
 }
 
 function saveTodoLeadLink() {
   const todo = todos.find(item => item.id === todoLeadModalTodoId);
   if (!todo) return;
-  const leadId = document.getElementById('todoLeadSelect')?.value || '';
   const nextStatus = document.getElementById('todoLeadStatusSelect')?.value || '';
-  if (!leadId) {
-    showToast('Choisis un lead ou crée-en un depuis cette note.', 'warning');
+  if (!todoLinkSelection?.id || !todoLinkSelection?.type) {
+    showToast('Choisis une fiche à lier à cette tâche.', 'warning');
     return;
   }
 
-  const prospect = prospects.find(item => item.id === leadId);
-  if (!prospect) {
-    showToast('Lead introuvable.', 'warning');
-    return;
-  }
-
-  todo.contextType = 'prospect';
-  todo.contextId = leadId;
-  if (nextStatus && prospect.status !== nextStatus) {
-    prospect.status = nextStatus;
-    prospect.updatedAt = Date.now();
-    logActivity('edit', 'prospect', prospect.name, `Étape mise à jour depuis le suivi vers ${getProspectStatusMeta(nextStatus).label}`);
-    saveProspects();
+  todo.contextType = todoLinkSelection.type;
+  todo.contextId = todoLinkSelection.id;
+  if (todoLinkSelection.type === 'prospect') {
+    const prospect = prospects.find(item => item.id === todoLinkSelection.id);
+    if (!prospect) {
+      showToast('Lead introuvable.', 'warning');
+      return;
+    }
+    if (nextStatus && prospect.status !== nextStatus) {
+      prospect.status = nextStatus;
+      prospect.updatedAt = Date.now();
+      logActivity('edit', 'prospect', prospect.name, `Étape mise à jour depuis le suivi vers ${getProspectStatusMeta(nextStatus).label}`);
+      saveProspects();
+    }
   }
   saveTodos();
   closeModal('todoLeadModal');
   renderTodos();
   renderProspects();
   renderDashboard();
-  showToast('Tâche liée et lead mis à jour', 'success');
+  showToast(todo.contextType === 'student' ? 'Tâche liée au client' : 'Tâche liée et lead mis à jour', 'success');
 }
 
 function createLeadFromTodo() {
@@ -1298,7 +1346,7 @@ function todoItemHtml(todo) {
   const contextLabel = todo.contextType === 'prospect' ? '👤 Lead' : todo.contextType === 'student' ? '🎓 Client' : '';
   const contextName = getContextDisplayName(todo.contextType, todo.contextId);
   const ownerName = getTodoOwnerName(todo);
-  const leadActionLabel = todo.contextType === 'prospect' ? 'Qualifier' : 'Lier lead';
+  const leadActionLabel = todo.contextType === 'prospect' ? 'Qualifier' : todo.contextType === 'student' ? 'Changer fiche' : 'Lier fiche';
   const hasLinkedRecord = Boolean(todo.contextType && todo.contextId && contextName);
   
   return `
@@ -3117,7 +3165,11 @@ function closeModal(id) {
   document.getElementById(id).style.display='none';
   if (id === 'detailModal') state.viewingId = null;
   if (id === 'prospectDetailModal') state.viewingProspectId = null;
-  if (id === 'todoLeadModal') todoLeadModalTodoId = null;
+  if (id === 'todoLeadModal') {
+    todoLeadModalTodoId = null;
+    todoLinkEntityType = 'prospect';
+    todoLinkSelection = null;
+  }
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
@@ -3186,6 +3238,17 @@ function setupEvents() {
   document.getElementById('cancelTodoEditBtn').addEventListener('click', resetTodoComposer);
   document.getElementById('todoLeadSaveBtn').addEventListener('click', saveTodoLeadLink);
   document.getElementById('todoLeadCreateBtn').addEventListener('click', createLeadFromTodo);
+  document.getElementById('todoEntitySearchInput').addEventListener('input', e => {
+    renderTodoEntityResults(e.target.value);
+  });
+  document.querySelectorAll('#todoEntityTypeTabs .segmented-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      todoLinkEntityType = btn.dataset.entityType || 'prospect';
+      todoLinkSelection = null;
+      renderTodoEntityTypeTabs();
+      renderTodoEntityResults(document.getElementById('todoEntitySearchInput')?.value || '');
+    });
+  });
   document.getElementById('syncDbBtn').addEventListener('click', async () => {
     if (!isWaxx()) return;
     dbConfig = {
@@ -3398,6 +3461,19 @@ function setupEvents() {
     if (!btn) return;
     e.stopPropagation();
     if (btn.dataset.openMeet) window.open(btn.dataset.openMeet, '_blank', 'noopener,noreferrer');
+  });
+
+  document.addEventListener('click', e => {
+    const pick = e.target.closest('[data-todo-entity-pick][data-todo-entity-type]');
+    if (pick) {
+      e.stopPropagation();
+      todoLinkSelection = {
+        id: pick.dataset.todoEntityPick,
+        type: pick.dataset.todoEntityType,
+      };
+      renderTodoEntityResults(document.getElementById('todoEntitySearchInput')?.value || '');
+      return;
+    }
   });
 
   document.addEventListener('click', e => {

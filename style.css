@@ -771,6 +771,13 @@ body {
 .todo-input-hint kbd { background: var(--bg); padding: 2px 5px; border-radius: 4px; font-size: 10px; font-family: 'SF Mono', 'Monaco', monospace; border: 1px solid var(--border); }
 .todo-context-bar { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--blue-bg); border: 1px solid rgba(0,122,255,0.14); color: var(--blue); padding: 10px 12px; border-radius: 12px; }
 .todo-context-copy { font-size: 12px; line-height: 1.4; }
+.todo-entity-results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 220px; overflow-y: auto; }
+.todo-entity-option { border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 10px 12px; cursor: pointer; transition: all 0.18s; }
+.todo-entity-option:hover { border-color: rgba(0,122,255,0.28); box-shadow: 0 8px 20px rgba(0,122,255,0.06); }
+.todo-entity-option.active { border-color: var(--blue); background: rgba(0,122,255,0.07); }
+.todo-entity-option strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.todo-entity-option span { display: block; font-size: 11px; color: var(--text2); line-height: 1.5; }
+.todo-entity-empty { border: 1px dashed var(--border); border-radius: 12px; padding: 14px; text-align: center; color: var(--text3); font-size: 12px; background: rgba(255,255,255,0.72); }
 .todo-assignee { background: rgba(52,199,89,0.12); color: #1E8E3E; padding: 2px 7px; border-radius: 20px; font-weight: 600; }
 .agenda-btn { border: none; background: rgba(0,122,255,0.12); color: var(--blue); border-radius: 10px; padding: 8px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
 .agenda-btn:hover { background: rgba(0,122,255,0.18); }
