@@ -16,7 +16,7 @@ Puis ouvrir `http://localhost:3000`.
 2. Importer ce dossier.
 3. Déployer tel quel.
 
-Le fichier [`vercel.json`](/Users/warren/Desktop/CRM/vercel.json) ajoute :
+Le fichier [`vercel.json`](/Users/warren/Documents/En cours /CRM/vercel.json) ajoute :
 - les headers de sécurité utiles
 - l'autorisation micro pour l'onglet IA
 - une réécriture globale vers `index.html`
@@ -26,7 +26,7 @@ Le fichier [`vercel.json`](/Users/warren/Desktop/CRM/vercel.json) ajoute :
 
 1. Créer un projet Supabase.
 2. Ouvrir l'éditeur SQL.
-3. Exécuter le contenu de [`supabase-schema.sql`](/Users/warren/Desktop/CRM/supabase-schema.sql).
+3. Exécuter le contenu de [`supabase-schema.sql`](/Users/warren/Documents/En cours /CRM/supabase-schema.sql).
 4. Dans le CRM, en compte `Waxx`, ouvrir `Assistant IA`.
 5. Renseigner :
    - l'URL du projet Supabase
@@ -35,6 +35,25 @@ Le fichier [`vercel.json`](/Users/warren/Desktop/CRM/vercel.json) ajoute :
 6. Cliquer `Enregistrer`, puis `Synchroniser maintenant`.
 
 Le CRM continuera à fonctionner en local tant que la BDD n'est pas configurée.
+
+## Google Agenda et Google Meet
+
+Le CRM peut maintenant créer de vrais événements Google Calendar avec lien Google Meet via les endpoints serveur `/api/google/*`.
+
+Variables d'environnement Vercel nécessaires :
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI`
+- `GOOGLE_CALENDAR_ID`
+
+Une fois les variables en place :
+
+1. Relancer un déploiement Vercel.
+2. Rejouer le SQL de [`supabase-schema.sql`](/Users/warren/Documents/En cours /CRM/supabase-schema.sql) pour ajouter `google_settings` et `google_oauth`.
+3. Dans le CRM, en compte `Waxx`, ouvrir `Assistant IA`.
+4. Cliquer `Connecter Google`.
+5. Utiliser les boutons `Agenda` du CRM pour créer les événements Google et les Meet.
 
 ## Attention production
 

@@ -25,6 +25,12 @@ let state = {
   todoScope: 'mine',
   aiDrafts: {},
   aiWorkspaceResult: { loading: false, text: '', error: '' },
+  google: {
+    connected: false,
+    connectedEmail: '',
+    calendarId: 'primary',
+    connectedAt: '',
+  },
 };
 
 const charts = {};
@@ -61,6 +67,15 @@ let aiSpeechShouldContinue = false;
 let aiSpeechCommittedText = '';
 let remoteSaveTimer = null;
 let todoLeadModalTodoId = null;
+
+function getDefaultGoogleState() {
+  return {
+    connected: false,
+    connectedEmail: '',
+    calendarId: 'primary',
+    connectedAt: '',
+  };
+}
 
 function mergeAiConfig(saved) {
   return {
@@ -812,33 +827,169 @@ function renderTodos() {
   renderTodoContextBar();
 }
 
-function exportCalendarEvent(title, date, time, description) {
-  if (!date) return;
-  const start = new Date(`${date}T${time || '09:00'}:00`);
-  const end = new Date(start.getTime() + 30 * 60000);
-  const formatIcs = value => value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-  const body = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//L Atelier CRM//FR',
-    'BEGIN:VEVENT',
-    `UID:${generateId()}@ateliercrm`,
-    `DTSTAMP:${formatIcs(new Date())}`,
-    `DTSTART:${formatIcs(start)}`,
-    `DTEND:${formatIcs(end)}`,
-    `SUMMARY:${title.replace(/\n/g, ' ')}`,
-    `DESCRIPTION:${(description || '').replace(/\n/g, ' ')}`,
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].join('\r\n');
+function getGoogleEventMeta(record) {
+  return record?.googleEvent && typeof record.googleEvent === 'object' ? record.googleEvent : null;
+}
 
-  const blob = new Blob([body], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${title.toLowerCase().replace(/[^a-z0-9]+/gi, '-') || 'rappel'}.ics`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function buildGoogleButtons(recordType, record) {
+  const event = getGoogleEventMeta(record);
+  const agendaAttr = recordType === 'prospect'
+    ? `data-agenda-lead="${esc(record.id)}"`
+    : `data-agenda-todo="${esc(record.id)}"`;
+  const agendaLabel = event?.htmlLink ? 'Agenda' : 'Google';
+  return `
+    <button class="agenda-btn" ${agendaAttr}>${agendaLabel}</button>
+    ${event?.meetLink ? `<button class="agenda-btn meet-btn" data-open-meet="${esc(event.meetLink)}">Meet</button>` : ''}
+  `;
+}
+
+function combineDateTime(date, time = '09:00') {
+  return new Date(`${date}T${time || '09:00'}:00`);
+}
+
+function formatGoogleDateTime(date, time = '09:00') {
+  return combineDateTime(date, time).toISOString();
+}
+
+async function fetchGoogleStatus() {
+  try {
+    const response = await fetch('/api/google/status', { cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error || 'Google indisponible');
+    state.google = {
+      ...getDefaultGoogleState(),
+      ...data,
+    };
+    updateGoogleStatusNote();
+    return true;
+  } catch (error) {
+    state.google = getDefaultGoogleState();
+    updateGoogleStatusNote(error.message || 'Google indisponible');
+    return false;
+  }
+}
+
+function updateGoogleStatusNote(message = '') {
+  const note = document.getElementById('googleStatusNote');
+  const connectBtn = document.getElementById('connectGoogleBtn');
+  if (connectBtn) connectBtn.textContent = state.google.connected ? 'Reconnecter Google' : 'Connecter Google';
+  if (!note) return;
+  if (message && !state.google.connected) {
+    note.textContent = message;
+    note.style.color = 'var(--text2)';
+    return;
+  }
+  note.textContent = state.google.connected
+    ? `Google Agenda connecté${state.google.connectedEmail ? ` : ${state.google.connectedEmail}` : ''}. Les boutons Agenda créent aussi un Google Meet.`
+    : 'Google Agenda non connecté. Waxx doit connecter le compte une fois pour toute l’équipe.';
+  note.style.color = state.google.connected ? 'var(--green)' : 'var(--text2)';
+}
+
+function connectGoogleCalendar() {
+  const popup = window.open('/api/google/oauth/start', 'atelier-google-oauth', 'width=520,height=720');
+  if (!popup) {
+    window.location.href = '/api/google/oauth/start';
+    return;
+  }
+}
+
+async function createGoogleCalendarEvent(payload) {
+  const response = await fetch('/api/google/calendar/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || 'Impossible de créer le rendez-vous Google');
+  return data;
+}
+
+async function syncProspectToGoogle(prospectId) {
+  const prospect = prospects.find(item => item.id === prospectId);
+  if (!prospect?.reminderDate) {
+    showToast('Ajoute une date de rappel avant de créer le rendez-vous', 'info');
+    return;
+  }
+  const existing = getGoogleEventMeta(prospect);
+  if (existing?.htmlLink) {
+    window.open(existing.htmlLink, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if (!state.google.connected) {
+    showToast('Google Agenda n’est pas encore connecté', 'info');
+    return;
+  }
+
+  const start = combineDateTime(prospect.reminderDate, prospect.reminderTime || '09:00');
+  const end = new Date(start.getTime() + 30 * 60000);
+  const event = await createGoogleCalendarEvent({
+    summary: `Relance ${prospect.name}`,
+    description: [prospect.reminderNote, prospect.notes, prospect.phone ? `Téléphone : ${prospect.phone}` : '', prospect.socialHandle ? `Pseudo : ${prospect.socialHandle}` : ''].filter(Boolean).join('\n'),
+    attendeeEmail: prospect.email || '',
+    attendeeName: prospect.name,
+    startDateTime: start.toISOString(),
+    endDateTime: end.toISOString(),
+    timeZone: 'Europe/Paris',
+  });
+  prospect.googleEvent = {
+    ...event,
+    syncedAt: new Date().toISOString(),
+  };
+  prospect.updatedAt = Date.now();
+  saveProspects();
+  renderProspects();
+  renderDashboard();
+  if (state.viewingProspectId === prospect.id) openProspectDetail(prospect.id);
+  showToast(event.meetLink ? 'Rendez-vous Google + Meet créés' : 'Rendez-vous Google créé', 'success');
+  if (event.htmlLink) window.open(event.htmlLink, '_blank', 'noopener,noreferrer');
+}
+
+async function syncTodoToGoogle(todoId) {
+  const todo = todos.find(item => item.id === todoId);
+  if (!todo?.dueDate) {
+    showToast('Ajoute une date à cette tâche avant de créer le rendez-vous', 'info');
+    return;
+  }
+  const existing = getGoogleEventMeta(todo);
+  if (existing?.htmlLink) {
+    window.open(existing.htmlLink, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if (!state.google.connected) {
+    showToast('Google Agenda n’est pas encore connecté', 'info');
+    return;
+  }
+
+  const linkedProspect = todo.contextType === 'prospect' ? prospects.find(item => item.id === todo.contextId) : null;
+  const linkedStudent = todo.contextType === 'student' ? state.students.find(item => item.id === todo.contextId) : null;
+  const attendeeEmail = linkedProspect?.email || linkedStudent?.email || '';
+  const attendeeName = linkedProspect?.name || linkedStudent?.name || '';
+  const description = [
+    todo.rawInput || todo.title,
+    linkedProspect?.phone ? `Téléphone : ${linkedProspect.phone}` : '',
+    linkedProspect?.socialHandle ? `Pseudo : ${linkedProspect.socialHandle}` : '',
+    linkedStudent?.phone ? `Téléphone : ${linkedStudent.phone}` : '',
+  ].filter(Boolean).join('\n');
+  const start = combineDateTime(todo.dueDate, todo.dueTime || '09:00');
+  const end = new Date(start.getTime() + 30 * 60000);
+  const event = await createGoogleCalendarEvent({
+    summary: todo.title,
+    description,
+    attendeeEmail,
+    attendeeName,
+    startDateTime: start.toISOString(),
+    endDateTime: end.toISOString(),
+    timeZone: 'Europe/Paris',
+  });
+  todo.googleEvent = {
+    ...event,
+    syncedAt: new Date().toISOString(),
+  };
+  saveTodos();
+  renderTodos();
+  renderDashboard();
+  showToast(event.meetLink ? 'Tâche synchronisée sur Google + Meet' : 'Tâche synchronisée sur Google', 'success');
+  if (event.htmlLink) window.open(event.htmlLink, '_blank', 'noopener,noreferrer');
 }
 
 function buildAiPrompts(kind, payload) {
@@ -990,7 +1141,7 @@ function todoItemHtml(todo) {
         </div>
       </div>
       <div class="todo-actions">
-        ${todo.dueDate ? `<button class="agenda-btn" data-agenda-todo="${esc(todo.id)}" title="Agenda Apple">Agenda</button>` : ''}
+        ${todo.dueDate ? buildGoogleButtons('todo', todo) : ''}
         <button class="todo-action-btn todo-link-btn" type="button" data-todo-link="${esc(todo.id)}" title="${esc(leadActionLabel)}">
           ${esc(leadActionLabel)}
         </button>
@@ -1319,6 +1470,7 @@ function getRemoteStatePayload() {
     ideas,
     journal: state.journal,
     ai_settings: aiConfig,
+    google_settings: state.google,
     updated_at: new Date().toISOString(),
   };
 }
@@ -1333,6 +1485,9 @@ function applyRemoteState(payload) {
     aiConfig = mergeAiConfig(payload.ai_settings);
     localStorage.setItem('crm_ai_config', JSON.stringify(aiConfig));
   }
+  state.google = payload.google_settings && typeof payload.google_settings === 'object'
+    ? { ...getDefaultGoogleState(), ...payload.google_settings }
+    : getDefaultGoogleState();
   localStorage.setItem('crm_students', JSON.stringify(state.students));
   localStorage.setItem('crm_journal', JSON.stringify(state.journal));
   localStorage.setItem('crm_prospects', JSON.stringify(prospects));
@@ -1421,6 +1576,7 @@ function populateAiModal() {
   document.getElementById('dbAnonKeyInput').value = dbConfig.anonKey || '';
   document.getElementById('dbWorkspaceInput').value = dbConfig.workspace || DB_DEFAULTS.workspace;
   updateDbStatus(isDbConfigured() ? 'BDD configurée. Tu peux synchroniser ou charger les données partagées.' : 'BDD non configurée. Le CRM fonctionne encore en local sur ce navigateur.');
+  updateGoogleStatusNote();
 }
 
 function openAiModal() {
@@ -1431,6 +1587,7 @@ function openAiModal() {
   aiModalProvider = aiConfig.provider;
   populateAiModal();
   openModal('aiModal');
+  fetchGoogleStatus();
 }
 
 async function saveAiModalConfig() {
@@ -2143,6 +2300,7 @@ function getDashboardAgendaItems() {
         type: 'prospect',
         id: item.id,
         startsAt,
+        googleEvent: item.googleEvent || null,
         dateLabel: formatDate(item.reminderDate),
         timeLabel: item.reminderTime || '09:00',
         title: item.name,
@@ -2160,6 +2318,7 @@ function getDashboardAgendaItems() {
         type: 'todo',
         id: item.id,
         startsAt,
+        googleEvent: item.googleEvent || null,
         dateLabel: formatDate(item.dueDate),
         timeLabel: item.dueTime || '09:00',
         title: item.title,
@@ -2838,6 +2997,7 @@ function setupEvents() {
   document.getElementById('mobileAiSettingsBtn').addEventListener('click', openAiModal);
   document.getElementById('openAiConfigHubBtn').addEventListener('click', openAiModal);
   document.getElementById('aiVoiceBtn').addEventListener('click', toggleAiVoiceCapture);
+  document.getElementById('connectGoogleBtn').addEventListener('click', connectGoogleCalendar);
   document.getElementById('saveAiConfigBtn').addEventListener('click', saveAiModalConfig);
   document.getElementById('todoLeadSaveBtn').addEventListener('click', saveTodoLeadLink);
   document.getElementById('todoLeadCreateBtn').addEventListener('click', createLeadFromTodo);
@@ -3034,18 +3194,25 @@ function setupEvents() {
     const btn = e.target.closest('[data-agenda-lead]');
     if (!btn) return;
     e.stopPropagation();
-    const prospect = prospects.find(item => item.id === btn.dataset.agendaLead);
-    if (!prospect?.reminderDate) return;
-    exportCalendarEvent(`Relance ${prospect.name}`, prospect.reminderDate, prospect.reminderTime || '09:00', prospect.reminderNote || 'Relance leads');
+    syncProspectToGoogle(btn.dataset.agendaLead).catch(error => {
+      showToast(error.message || 'Erreur Google Agenda', 'error');
+    });
   });
 
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-agenda-todo]');
     if (!btn) return;
     e.stopPropagation();
-    const todo = todos.find(item => item.id === btn.dataset.agendaTodo);
-    if (!todo?.dueDate) return;
-    exportCalendarEvent(todo.title, todo.dueDate, todo.dueTime || '09:00', 'Tâche CRM');
+    syncTodoToGoogle(btn.dataset.agendaTodo).catch(error => {
+      showToast(error.message || 'Erreur Google Agenda', 'error');
+    });
+  });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-open-meet]');
+    if (!btn) return;
+    e.stopPropagation();
+    if (btn.dataset.openMeet) window.open(btn.dataset.openMeet, '_blank', 'noopener,noreferrer');
   });
 
   document.addEventListener('click', e => {
@@ -3085,7 +3252,7 @@ function setupEvents() {
   // Reminder item click
   document.addEventListener('click', e => {
     const item = e.target.closest('.reminder-item');
-    if (item && !e.target.closest('.reminder-call-btn') && !e.target.closest('[data-agenda-lead]') && !e.target.closest('[data-agenda-todo]')) {
+    if (item && !e.target.closest('.reminder-call-btn') && !e.target.closest('[data-agenda-lead]') && !e.target.closest('[data-agenda-todo]') && !e.target.closest('[data-open-meet]')) {
       if (item.dataset.dashboardTodo) {
         toggleTodo(item.dataset.dashboardTodo);
         return;
@@ -3113,6 +3280,17 @@ function setupEvents() {
     const trigger = e.target.closest('[data-ai-workspace-action]');
     if (!trigger) return;
     runAiWorkspaceAction(trigger.dataset.aiWorkspaceAction);
+  });
+
+  window.addEventListener('message', e => {
+    if (e.origin !== window.location.origin) return;
+    if (!e.data || e.data.source !== 'atelier-google-oauth') return;
+    fetchGoogleStatus();
+    if (e.data.ok) {
+      showToast(e.data.email ? `Google connecté : ${e.data.email}` : 'Google connecté', 'success');
+    } else {
+      showToast(e.data.message || 'Connexion Google échouée', 'error');
+    }
   });
 
   // Command Palette (Cmd+K / Ctrl+K)
@@ -3354,8 +3532,8 @@ function renderDashboardReminders() {
           <div class="reminder-note">${esc(item.subtitle)}</div>
         </div>
         ${item.type === 'prospect'
-          ? `<button class="agenda-btn" data-agenda-lead="${esc(item.id)}">Agenda</button><button class="reminder-call-btn" data-id="${esc(item.id)}">📞</button>`
-          : `<button class="agenda-btn" data-agenda-todo="${esc(item.id)}">Agenda</button>`
+          ? `${buildGoogleButtons('prospect', item)}<button class="reminder-call-btn" data-id="${esc(item.id)}">📞</button>`
+          : buildGoogleButtons('todo', item)
         }
       </div>
     `).join('')}
@@ -3410,6 +3588,7 @@ function openEditProspect(id) {
 }
 
 function saveProspect() {
+  const existingProspect = prospects.find(p => p.id === editingProspectId);
   const name = document.getElementById('pfName').value.trim();
   const phone = document.getElementById('pfPhone').value.trim();
   if (!name || !phone) {
@@ -3435,7 +3614,8 @@ function saveProspect() {
     reminderTime: document.getElementById('pfReminderTime').value,
     reminderNote: document.getElementById('pfReminderNote').value.trim(),
     notes: document.getElementById('pfNotes').value.trim(),
-    createdAt: isNew ? Date.now() : (prospects.find(p => p.id === editingProspectId)?.createdAt || Date.now()),
+    googleEvent: existingProspect?.googleEvent || null,
+    createdAt: isNew ? Date.now() : (existingProspect?.createdAt || Date.now()),
     updatedAt: Date.now(),
   };
   
@@ -3494,7 +3674,7 @@ function openProspectDetail(id) {
           <div style="font-size:14px;font-weight:600;margin-bottom:2px">${formatDate(p.reminderDate)} ${p.reminderTime ? 'à ' + p.reminderTime : ''}</div>
           ${p.reminderNote ? `<div style="font-size:12px;color:var(--text2)">${esc(p.reminderNote)}</div>` : ''}
         </div>
-        <button class="agenda-btn" type="button" data-agenda-lead="${esc(p.id)}">Agenda</button>
+        ${buildGoogleButtons('prospect', p)}
       </div>
     ` : ''}
     ${p.notes ? `
@@ -3553,6 +3733,7 @@ function convertProspectToStudent(id, options = {}) {
     notes: [p.notes, p.source ? `Source lead : ${p.source}` : '', `Converti le ${formatDate(new Date().toISOString().split('T')[0])}`].filter(Boolean).join('\n'),
     photo: null,
     source: p.source || '',
+    googleEvent: p.googleEvent || null,
     originProspectId: p.id,
     convertedAt: Date.now(),
     createdAt: Date.now(),
@@ -3679,6 +3860,7 @@ async function init() {
     const loaded = await loadRemoteState();
     if (loaded && state.currentUser) showView(document.querySelector('.nav-link.active')?.dataset.view || 'dashboard');
   }
+  fetchGoogleStatus();
 }
 
 document.addEventListener('DOMContentLoaded', init);

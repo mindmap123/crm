@@ -745,6 +745,12 @@
         Cette V1 stocke la clé API dans le navigateur pour aller vite. Pour une vraie prod, il faudra la passer côté serveur.
       </div>
       <div class="form-group" style="margin-top:18px">
+        <label>Google Agenda et Meet</label>
+        <div class="detail-notes" id="googleStatusNote" style="margin-top:8px">
+          Google Agenda non connecté. Waxx doit connecter le compte une fois pour toute l’équipe.
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:18px">
         <label>Base de données Supabase</label>
         <input type="text" id="dbUrlInput" placeholder="https://xxxx.supabase.co">
       </div>
@@ -761,6 +767,7 @@
       </div>
     </div>
     <div class="modal-foot">
+      <button class="btn-ghost" id="connectGoogleBtn" type="button">Connecter Google</button>
       <button class="btn-ghost" id="syncDbBtn" type="button">Synchroniser maintenant</button>
       <button class="btn-ghost" data-close="aiModal">Fermer</button>
       <button class="btn-primary" id="saveAiConfigBtn">Enregistrer</button>
