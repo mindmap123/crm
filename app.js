@@ -75,6 +75,7 @@ let remoteSaveTimer = null;
 let todoLeadModalTodoId = null;
 let todoLinkEntityType = 'prospect';
 let todoLinkSelection = null;
+let todoCompletionModalTodoId = null;
 
 function getDefaultGoogleState() {
   return {
@@ -915,14 +916,86 @@ function createLeadFromTodo() {
   showToast(`Lead créé depuis le suivi : ${result.name}`, 'success');
 }
 
+function openTodoCompletionModal(id) {
+  const todo = todos.find(item => item.id === id);
+  if (!todo) return;
+  todoCompletionModalTodoId = id;
+  const summary = document.getElementById('todoCompleteSummary');
+  const outcome = document.getElementById('todoCompleteOutcome');
+  const leadStatus = document.getElementById('todoCompleteLeadStatus');
+  const leadStatusGroup = document.getElementById('todoCompleteLeadStatusGroup');
+  const note = document.getElementById('todoCompleteNote');
+  if (!summary || !outcome || !leadStatus || !leadStatusGroup || !note) return;
+
+  summary.textContent = todo.title;
+  outcome.value = 'done';
+  note.value = '';
+  leadStatus.value = '';
+  leadStatusGroup.style.display = todo.contextType === 'prospect' ? 'block' : 'none';
+  openModal('todoCompleteModal');
+}
+
+function appendFollowUpNote(target, text) {
+  if (!text) return;
+  target.notes = [target.notes || '', text].filter(Boolean).join('\n');
+  target.updatedAt = Date.now();
+}
+
+function completeTodoWithOutcome() {
+  const todo = todos.find(item => item.id === todoCompletionModalTodoId);
+  if (!todo) return;
+  const outcome = document.getElementById('todoCompleteOutcome')?.value || 'done';
+  const note = document.getElementById('todoCompleteNote')?.value.trim() || '';
+  const leadStatus = document.getElementById('todoCompleteLeadStatus')?.value || '';
+
+  if (todo.contextType === 'prospect' && todo.contextId) {
+    const prospect = prospects.find(item => item.id === todo.contextId);
+    if (prospect) {
+      if (leadStatus) prospect.status = leadStatus;
+      if (outcome === 'qualified') prospect.status = 'chaud';
+      if (outcome === 'signed') prospect.status = 'signe';
+      appendFollowUpNote(prospect, [note, `Action terminée : ${todo.title}`].filter(Boolean).join('\n'));
+      if (outcome === 'signed') {
+        closeModal('todoCompleteModal');
+        toggleTodo(todo.id);
+        convertProspectToStudent(prospect.id, { silent: true, skipPrompt: true, source: 'todo' });
+        showToast('Tâche terminée et lead converti en client', 'success');
+        return;
+      }
+      saveProspects();
+      logActivity('edit', 'prospect', prospect.name, `Suivi terminé : ${outcome}`);
+    }
+  }
+
+  if (todo.contextType === 'student' && todo.contextId) {
+    const student = state.students.find(item => item.id === todo.contextId);
+    if (student) {
+      appendFollowUpNote(student, [note, `Action terminée : ${todo.title}`].filter(Boolean).join('\n'));
+      saveStudents();
+      logAction('edit', student.name, `Suivi terminé : ${outcome}`);
+    }
+  }
+
+  closeModal('todoCompleteModal');
+  toggleTodo(todo.id);
+}
+
 function toggleTodo(id) {
   const todo = todos.find(t => t.id === id);
   if (!todo) return;
+  if (todo.status !== 'done' && todo.contextType && todo.contextId && todoCompletionModalTodoId !== id) {
+    openTodoCompletionModal(id);
+    return;
+  }
   todo.status = todo.status === 'done' ? 'pending' : 'done';
   todo.completedAt = todo.status === 'done' ? Date.now() : null;
+  todoCompletionModalTodoId = null;
   saveTodos();
   logActivity('edit', 'todo', todo.title, todo.status === 'done' ? 'Tâche terminée' : 'Tâche réactivée');
   renderTodos();
+  renderProspects();
+  renderStudents();
+  renderDashboard();
   updateTodoBadges();
   showToast(todo.status === 'done' ? 'Tâche terminée ✓' : 'Tâche rétablie', todo.status === 'done' ? 'success' : 'info');
 }
@@ -3170,6 +3243,7 @@ function closeModal(id) {
     todoLinkEntityType = 'prospect';
     todoLinkSelection = null;
   }
+  if (id === 'todoCompleteModal') todoCompletionModalTodoId = null;
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
@@ -3238,6 +3312,7 @@ function setupEvents() {
   document.getElementById('cancelTodoEditBtn').addEventListener('click', resetTodoComposer);
   document.getElementById('todoLeadSaveBtn').addEventListener('click', saveTodoLeadLink);
   document.getElementById('todoLeadCreateBtn').addEventListener('click', createLeadFromTodo);
+  document.getElementById('todoCompleteSaveBtn').addEventListener('click', completeTodoWithOutcome);
   document.getElementById('todoEntitySearchInput').addEventListener('input', e => {
     renderTodoEntityResults(e.target.value);
   });
