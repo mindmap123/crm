@@ -10,6 +10,7 @@ const API_ROUTES = {
   '/api/google/oauth/start': path.join(ROOT, 'api/google/oauth/start.js'),
   '/api/google/oauth/callback': path.join(ROOT, 'api/google/oauth/callback.js'),
   '/api/google/calendar/event': path.join(ROOT, 'api/google/calendar/event.js'),
+  '/api/google/gmail/invite': path.join(ROOT, 'api/google/gmail/invite.js'),
 };
 
 const MIME_TYPES = {

@@ -54,6 +54,7 @@ Une fois les variables en place :
 3. Dans le CRM, en compte `Waxx`, ouvrir `Assistant IA`.
 4. Cliquer `Connecter Google`.
 5. Utiliser les boutons `Agenda` du CRM pour créer les événements Google et les Meet.
+6. Après l’ajout de Gmail, recliquer `Connecter Google` une fois pour accorder aussi le scope `gmail.send`.
 
 ## Attention production
 

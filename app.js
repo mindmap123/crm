@@ -1110,14 +1110,34 @@ function getGoogleEventMeta(record) {
   return record?.googleEvent && typeof record.googleEvent === 'object' ? record.googleEvent : null;
 }
 
+function getInvitationTarget(recordType, record) {
+  if (recordType === 'prospect') {
+    return {
+      email: record.email || '',
+      name: record.name || '',
+      phone: record.phone || '',
+    };
+  }
+  const linkedProspect = record.contextType === 'prospect' ? prospects.find(item => item.id === record.contextId) : null;
+  const linkedStudent = record.contextType === 'student' ? state.students.find(item => item.id === record.contextId) : null;
+  const entity = linkedProspect || linkedStudent;
+  return {
+    email: entity?.email || '',
+    name: entity?.name || '',
+    phone: entity?.phone || '',
+  };
+}
+
 function buildGoogleButtons(recordType, record) {
   const event = getGoogleEventMeta(record);
   const agendaAttr = recordType === 'prospect'
     ? `data-agenda-lead="${esc(record.id)}"`
     : `data-agenda-todo="${esc(record.id)}"`;
   const agendaLabel = event?.htmlLink ? 'Agenda' : 'Google';
+  const invitation = getInvitationTarget(recordType, record);
   return `
     <button class="agenda-btn" ${agendaAttr}>${agendaLabel}</button>
+    ${invitation.email ? `<button class="agenda-btn" data-send-invite-${recordType === 'prospect' ? 'lead' : 'todo'}="${esc(record.id)}">Inviter</button>` : ''}
     ${event?.meetLink ? `<button class="agenda-btn meet-btn" data-open-meet="${esc(event.meetLink)}">Meet</button>` : ''}
   `;
 }
@@ -1183,6 +1203,17 @@ async function createGoogleCalendarEvent(payload) {
   return data;
 }
 
+async function sendGoogleInvitation(payload) {
+  const response = await fetch('/api/google/gmail/invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || 'Impossible d’envoyer l’invitation Gmail');
+  return data;
+}
+
 async function syncProspectToGoogle(prospectId) {
   const prospect = prospects.find(item => item.id === prospectId);
   if (!prospect?.reminderDate) {
@@ -1232,6 +1263,14 @@ async function syncProspectToGoogle(prospectId) {
   if (state.viewingProspectId === prospect.id) openProspectDetail(prospect.id);
   showToast(event.meetLink ? 'Rendez-vous Google + Meet créés' : 'Rendez-vous Google créé', 'success');
   if (event.htmlLink) window.open(event.htmlLink, '_blank', 'noopener,noreferrer');
+}
+
+async function ensureProspectGoogleEvent(prospectId) {
+  const prospect = prospects.find(item => item.id === prospectId);
+  if (!prospect) throw new Error('Lead introuvable');
+  if (prospect.googleEvent?.htmlLink) return prospect.googleEvent;
+  await syncProspectToGoogle(prospectId);
+  return prospects.find(item => item.id === prospectId)?.googleEvent || null;
 }
 
 async function syncTodoToGoogle(todoId) {
@@ -1286,6 +1325,58 @@ async function syncTodoToGoogle(todoId) {
   renderDashboard();
   showToast(event.meetLink ? 'Tâche synchronisée sur Google + Meet' : 'Tâche synchronisée sur Google', 'success');
   if (event.htmlLink) window.open(event.htmlLink, '_blank', 'noopener,noreferrer');
+}
+
+async function ensureTodoGoogleEvent(todoId) {
+  const todo = todos.find(item => item.id === todoId);
+  if (!todo) throw new Error('Tâche introuvable');
+  if (todo.googleEvent?.htmlLink) return todo.googleEvent;
+  await syncTodoToGoogle(todoId);
+  return todos.find(item => item.id === todoId)?.googleEvent || null;
+}
+
+async function sendProspectInvitation(prospectId) {
+  const prospect = prospects.find(item => item.id === prospectId);
+  if (!prospect?.email) {
+    showToast('Ajoute un email sur ce lead avant d’envoyer l’invitation', 'info');
+    return;
+  }
+  const event = await ensureProspectGoogleEvent(prospectId);
+  if (!event?.startDateTime) throw new Error('Le rendez-vous Google n’a pas pu être créé');
+  await sendGoogleInvitation({
+    to: prospect.email,
+    name: prospect.name,
+    startDateTime: event.startDateTime,
+    meetLink: event.meetLink || '',
+    calendarLink: event.htmlLink || '',
+    senderName: state.currentUser?.name || 'L’Atelier CRM',
+    intro: 'Voici ton invitation pour notre échange.',
+    note: prospect.reminderNote || '',
+  });
+  showToast('Invitation Gmail envoyée', 'success');
+}
+
+async function sendTodoInvitation(todoId) {
+  const todo = todos.find(item => item.id === todoId);
+  if (!todo) throw new Error('Tâche introuvable');
+  const target = getInvitationTarget('todo', todo);
+  if (!target.email) {
+    showToast('Ajoute un email sur la fiche liée avant d’envoyer l’invitation', 'info');
+    return;
+  }
+  const event = await ensureTodoGoogleEvent(todoId);
+  if (!event?.startDateTime) throw new Error('Le rendez-vous Google n’a pas pu être créé');
+  await sendGoogleInvitation({
+    to: target.email,
+    name: target.name,
+    startDateTime: event.startDateTime,
+    meetLink: event.meetLink || '',
+    calendarLink: event.htmlLink || '',
+    senderName: state.currentUser?.name || 'L’Atelier CRM',
+    intro: 'Voici ton invitation pour notre échange.',
+    note: todo.title,
+  });
+  showToast('Invitation Gmail envoyée', 'success');
 }
 
 function buildAiPrompts(kind, payload) {
@@ -3528,6 +3619,24 @@ function setupEvents() {
     e.stopPropagation();
     syncTodoToGoogle(btn.dataset.agendaTodo).catch(error => {
       showToast(error.message || 'Erreur Google Agenda', 'error');
+    });
+  });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-send-invite-lead]');
+    if (!btn) return;
+    e.stopPropagation();
+    sendProspectInvitation(btn.dataset.sendInviteLead).catch(error => {
+      showToast(error.message || 'Erreur Gmail', 'error');
+    });
+  });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-send-invite-todo]');
+    if (!btn) return;
+    e.stopPropagation();
+    sendTodoInvitation(btn.dataset.sendInviteTodo).catch(error => {
+      showToast(error.message || 'Erreur Gmail', 'error');
     });
   });
 
