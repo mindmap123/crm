@@ -1686,8 +1686,9 @@ function updateRoleVisibility() {
   document.querySelectorAll('.nav-journal-only').forEach(el => {
     el.style.display = showJournal ? 'flex' : 'none';
   });
+  // Allow all users to access AI settings for synchronization
   document.querySelectorAll('.ai-config-only').forEach(el => {
-    el.style.display = showJournal ? '' : 'none';
+    el.style.display = '';
   });
   const aiConfigNote = document.querySelector('.ai-config-note');
   if (aiConfigNote) aiConfigNote.style.display = showJournal ? 'none' : 'block';
@@ -1960,29 +1961,52 @@ function getActiveAiProviderConfig() {
 
 function populateAiModal() {
   const modalProvider = aiModalProvider || aiConfig.provider;
+  const isWaxxUser = isWaxx();
+  
   document.querySelectorAll('#aiProviderTabs .segmented-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.provider === modalProvider);
+    btn.disabled = !isWaxxUser;
   });
+  
   const providerConfig = aiConfig.providers[modalProvider] || AI_DEFAULTS.providers[modalProvider];
-  document.getElementById('aiModelInput').value = providerConfig.model || '';
-  document.getElementById('aiApiKeyInput').value = providerConfig.apiKey || '';
-  document.getElementById('aiStyleInput').value = aiConfig.style || '';
-  document.getElementById('dbUrlInput').value = dbConfig.url || '';
-  document.getElementById('dbAnonKeyInput').value = dbConfig.anonKey || '';
-  document.getElementById('dbWorkspaceInput').value = dbConfig.workspace || DB_DEFAULTS.workspace;
+  const aiModelInput = document.getElementById('aiModelInput');
+  const aiApiKeyInput = document.getElementById('aiApiKeyInput');
+  const aiStyleInput = document.getElementById('aiStyleInput');
+  const dbUrlInput = document.getElementById('dbUrlInput');
+  const dbAnonKeyInput = document.getElementById('dbAnonKeyInput');
+  const dbWorkspaceInput = document.getElementById('dbWorkspaceInput');
+  
+  aiModelInput.value = providerConfig.model || '';
+  aiApiKeyInput.value = providerConfig.apiKey || '';
+  aiStyleInput.value = aiConfig.style || '';
+  dbUrlInput.value = dbConfig.url || '';
+  dbAnonKeyInput.value = dbConfig.anonKey || '';
+  dbWorkspaceInput.value = dbConfig.workspace || DB_DEFAULTS.workspace;
+  
+  // Make fields readonly for non-Waxx users
+  aiModelInput.readOnly = !isWaxxUser;
+  aiApiKeyInput.readOnly = !isWaxxUser;
+  aiStyleInput.readOnly = !isWaxxUser;
+  dbUrlInput.readOnly = !isWaxxUser;
+  dbAnonKeyInput.readOnly = !isWaxxUser;
+  dbWorkspaceInput.readOnly = !isWaxxUser;
+  
   updateDbStatus(isDbConfigured() ? 'BDD configurée. Tu peux synchroniser ou charger les données partagées.' : 'BDD non configurée. Le CRM fonctionne encore en local sur ce navigateur.');
   updateGoogleStatusNote();
 }
 
+
 function openAiModal() {
-  if (!isWaxx()) {
-    showToast('Seul Waxx gère les clés API', 'info');
-    return;
-  }
+  // Allow all users to open AI modal for synchronization
   aiModalProvider = aiConfig.provider;
   populateAiModal();
   openModal('aiModal');
   fetchGoogleStatus();
+  
+  // Show info message for non-Waxx users
+  if (!isWaxx()) {
+    showToast('Tu peux synchroniser tes données. Seul Waxx peut modifier les clés API.', 'info');
+  }
 }
 
 async function saveAiModalConfig() {
@@ -3416,7 +3440,7 @@ function setupEvents() {
     });
   });
   document.getElementById('syncDbBtn').addEventListener('click', async () => {
-    if (!isWaxx()) return;
+    // Allow all users to sync, not just Waxx
     dbConfig = {
       url: document.getElementById('dbUrlInput').value.trim().replace(/\/$/, ''),
       anonKey: document.getElementById('dbAnonKeyInput').value.trim(),
