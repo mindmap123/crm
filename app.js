@@ -1991,7 +1991,7 @@ function populateAiModal() {
   dbAnonKeyInput.readOnly = !isWaxxUser;
   dbWorkspaceInput.readOnly = !isWaxxUser;
   
-  updateDbStatus(isDbConfigured() ? 'BDD configurée. Tu peux synchroniser ou charger les données partagées.' : 'BDD non configurée. Le CRM fonctionne encore en local sur ce navigateur.');
+  updateDbStatus(isDbConfigured() ? 'BDD configurée. Clique sur "Charger depuis la base" pour récupérer les données partagées.' : 'BDD non configurée. Le CRM fonctionne encore en local sur ce navigateur.');
   updateGoogleStatusNote();
 }
 
@@ -3440,17 +3440,44 @@ function setupEvents() {
     });
   });
   document.getElementById('syncDbBtn').addEventListener('click', async () => {
-    // Allow all users to sync, not just Waxx
+    // Only Waxx can save to database (to avoid overwriting data)
+    if (!isWaxx()) {
+      showToast('Seul Waxx peut sauvegarder vers la base', 'warning');
+      return;
+    }
     dbConfig = {
       url: document.getElementById('dbUrlInput').value.trim().replace(/\/$/, ''),
       anonKey: document.getElementById('dbAnonKeyInput').value.trim(),
       workspace: document.getElementById('dbWorkspaceInput').value.trim() || DB_DEFAULTS.workspace,
     };
     saveDbConfig();
-    updateDbStatus('Synchronisation en cours...');
+    updateDbStatus('Sauvegarde en cours...');
     await saveRemoteState();
-    await loadRemoteState();
-    if (state.currentUser) showView(document.querySelector('.nav-link.active')?.dataset.view || 'dashboard');
+    showToast('Données sauvegardées vers la base', 'success');
+  });
+  
+  document.getElementById('loadDbBtn').addEventListener('click', async () => {
+    // All users can load from database
+    dbConfig = {
+      url: document.getElementById('dbUrlInput').value.trim().replace(/\/$/, ''),
+      anonKey: document.getElementById('dbAnonKeyInput').value.trim(),
+      workspace: document.getElementById('dbWorkspaceInput').value.trim() || DB_DEFAULTS.workspace,
+    };
+    saveDbConfig();
+    updateDbStatus('Chargement en cours...');
+    const loaded = await loadRemoteState();
+    if (loaded) {
+      showToast('Données chargées depuis la base', 'success');
+      if (state.currentUser) {
+        renderDashboard();
+        renderProspects();
+        renderTodos();
+        renderIdeas();
+        showView(document.querySelector('.nav-link.active')?.dataset.view || 'dashboard');
+      }
+    } else {
+      showToast('Aucune donnée trouvée dans la base', 'info');
+    }
   });
   document.querySelectorAll('#aiProviderTabs .segmented-btn').forEach(btn => {
     btn.addEventListener('click', () => {
